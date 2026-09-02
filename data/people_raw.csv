@@ -1,0 +1,101 @@
+id,investor_id,full_name,role_title,email,linkedin_url,is_decision_maker,verified
+b0000001-0000-0000-0000-000000000001,a0000001-0000-0000-0000-000000000001,Roelof Botha,Senior Managing Partner,info@sequoiacap.com,https://linkedin.com/in/roelofbotha,true,false
+b0000001-0000-0000-0000-000000000002,a0000001-0000-0000-0000-000000000001,Shaun Maguire,Partner (AI & Deeptech),info@sequoiacap.com,https://linkedin.com/in/shaunmaguire,true,false
+b0000001-0000-0000-0000-000000000003,a0000001-0000-0000-0000-000000000002,Marc Andreessen,Co-founder & General Partner,contact@a16z.com,https://linkedin.com/in/marcandreessen,true,false
+b0000001-0000-0000-0000-000000000004,a0000001-0000-0000-0000-000000000002,Martin Casado,General Partner (AI & Infrastructure),contact@a16z.com,https://linkedin.com/in/martincasado,true,false
+b0000001-0000-0000-0000-000000000005,a0000001-0000-0000-0000-000000000003,Ravi Mhatre,Founding Managing Partner,info@lsvp.com,https://linkedin.com/in/ravimhatre,true,false
+b0000001-0000-0000-0000-000000000006,a0000001-0000-0000-0000-000000000003,Dev Khare,Partner (B2B SaaS),info@lsvp.com,https://linkedin.com/in/devkhare,true,false
+b0000001-0000-0000-0000-000000000007,a0000001-0000-0000-0000-000000000004,Sameer Gandhi,Partner,contact@accel.com,https://linkedin.com/in/sameergandhi,true,false
+b0000001-0000-0000-0000-000000000008,a0000001-0000-0000-0000-000000000004,Prashanth Prakash,Partner (India),contact@accel.com,https://linkedin.com/in/prashanthprakash,true,false
+b0000001-0000-0000-0000-000000000009,a0000001-0000-0000-0000-000000000005,Jan Hammer,Partner (Fintech & Data),contact@indexventures.com,https://linkedin.com/in/janhammer,true,false
+b0000001-0000-0000-0000-000000000010,a0000001-0000-0000-0000-000000000006,Peter Fenton,General Partner,info@benchmark.com,https://linkedin.com/in/peterfenton,true,false
+b0000001-0000-0000-0000-000000000011,a0000001-0000-0000-0000-000000000007,Byron Deeter,Partner (Cloud Practice Lead),info@bvp.com,https://linkedin.com/in/byrondeeter,true,false
+b0000001-0000-0000-0000-000000000012,a0000001-0000-0000-0000-000000000008,Hemant Taneja,CEO & Managing Director,info@generalcatalyst.com,https://linkedin.com/in/hemanttaneja,true,false
+b0000001-0000-0000-0000-000000000013,a0000001-0000-0000-0000-000000000009,Vinod Khosla,Founder & Managing Partner,info@khoslaventures.com,https://linkedin.com/in/vinodkhosla,true,false
+b0000001-0000-0000-0000-000000000014,a0000001-0000-0000-0000-000000000010,Brian Singerman,Partner,info@foundersfund.com,https://linkedin.com/in/briansingerman,true,false
+b0000001-0000-0000-0000-000000000015,a0000001-0000-0000-0000-000000000011,Avnish Bajaj,Founder & Managing Director,info@matrixpartners.in,https://linkedin.com/in/avnishbajaj,true,false
+b0000001-0000-0000-0000-000000000016,a0000001-0000-0000-0000-000000000012,Shailendra Singh,Managing Director,info@peakxv.com,https://linkedin.com/in/shailendrasingh,true,false
+b0000001-0000-0000-0000-000000000017,a0000001-0000-0000-0000-000000000013,Karthik Reddy,Managing Partner,pitch@blume.vc,https://linkedin.com/in/karthikreddy,true,false
+b0000001-0000-0000-0000-000000000018,a0000001-0000-0000-0000-000000000014,Mukul Arora,Managing Partner,pitch@elevationcapital.com,https://linkedin.com/in/mukularora,true,false
+b0000001-0000-0000-0000-000000000019,a0000001-0000-0000-0000-000000000015,Deven Parekh,Managing Director,info@insightpartners.com,https://linkedin.com/in/devenparekh,true,false
+b0000001-0000-0000-0000-000000000020,a0000001-0000-0000-0000-000000000016,Suranga Chandratillake,General Partner,info@balderton.com,https://linkedin.com/in/surangac,true,false
+b0000001-0000-0000-0000-000000000021,a0000001-0000-0000-0000-000000000017,Jeppe Zink,General Partner,info@northzone.com,https://linkedin.com/in/jeppezink,true,false
+b0000001-0000-0000-0000-000000000022,a0000001-0000-0000-0000-000000000018,Garry Tan,President & CEO,apply@ycombinator.com,https://linkedin.com/in/garrytan,true,true
+b0000001-0000-0000-0000-000000000023,a0000001-0000-0000-0000-000000000019,Josh Kopelman,Founding Partner,info@firstround.com,https://linkedin.com/in/joshkopelman,true,false
+b0000001-0000-0000-0000-000000000024,a0000001-0000-0000-0000-000000000020,Brett Gibson,Managing Partner,pitch@initialized.com,https://linkedin.com/in/brettgibson,true,false
+b0000001-0000-0000-0000-000000000025,a0000001-0000-0000-0000-000000000021,Mamoon Hamid,Partner,info@kleinerperkins.com,https://linkedin.com/in/mamoon,true,false
+b0000001-0000-0000-0000-000000000026,a0000001-0000-0000-0000-000000000022,Saam Motamedi,Partner,contact@greylock.com,https://linkedin.com/in/saammotamedi,true,false
+b0000001-0000-0000-0000-000000000027,a0000001-0000-0000-0000-000000000023,Scott Sandell,Executive Chairman & CIO,info@nea.com,https://linkedin.com/in/scottsandell,true,false
+b0000001-0000-0000-0000-000000000028,a0000001-0000-0000-0000-000000000024,Satish Dharmaraj,Managing Director,info@redpoint.com,https://linkedin.com/in/satishdharmaraj,true,false
+b0000001-0000-0000-0000-000000000029,a0000001-0000-0000-0000-000000000025,David Sacks,Co-founder & General Partner,info@craftventures.com,https://linkedin.com/in/davidsacks,true,false
+b0000001-0000-0000-0000-000000000030,a0000001-0000-0000-0000-000000000026,Matt Murphy,Partner,info@menlovc.com,https://linkedin.com/in/mattmurphy,true,false
+b0000001-0000-0000-0000-000000000031,a0000001-0000-0000-0000-000000000027,Somesh Dash,General Partner,info@ivp.com,https://linkedin.com/in/someshdash,true,false
+b0000001-0000-0000-0000-000000000032,a0000001-0000-0000-0000-000000000028,Bijan Sabet,General Partner,info@sparkcapital.com,https://linkedin.com/in/bijansabet,true,false
+b0000001-0000-0000-0000-000000000033,a0000001-0000-0000-0000-000000000029,Murat Bicer,General Partner,contact@crv.com,https://linkedin.com/in/muratbicer,true,false
+b0000001-0000-0000-0000-000000000034,a0000001-0000-0000-0000-000000000030,Fred Wilson,Partner,info@usv.com,https://linkedin.com/in/fredwilson,true,false
+b0000001-0000-0000-0000-000000000035,a0000001-0000-0000-0000-000000000031,Sam Lessin,General Partner,team@slow.co,https://linkedin.com/in/samlessin,true,false
+b0000001-0000-0000-0000-000000000036,a0000001-0000-0000-0000-000000000032,Joe Lonsdale,Managing Partner,info@8vc.com,https://linkedin.com/in/joelonsdale,true,false
+b0000001-0000-0000-0000-000000000037,a0000001-0000-0000-0000-000000000033,Josh Wolfe,Co-Founder & Managing Partner,info@luxcapital.com,https://linkedin.com/in/joshwolfe,true,false
+b0000001-0000-0000-0000-000000000038,a0000001-0000-0000-0000-000000000034,Kirsten Green,Founder & Managing Partner,info@forerunnerventures.com,https://linkedin.com/in/kirstengreen,true,false
+b0000001-0000-0000-0000-000000000039,a0000001-0000-0000-0000-000000000035,Aydin Senkut,Founder & Managing Partner,info@felicis.com,https://linkedin.com/in/aydinsenkut,true,false
+b0000001-0000-0000-0000-000000000040,a0000001-0000-0000-0000-000000000036,John Vrionis,Managing Partner,team@unusual.vc,https://linkedin.com/in/johnvrionis,true,false
+b0000001-0000-0000-0000-000000000041,a0000001-0000-0000-0000-000000000037,Greg Sands,Founder & Managing Partner,info@costanoavc.com,https://linkedin.com/in/gregsands,true,false
+b0000001-0000-0000-0000-000000000042,a0000001-0000-0000-0000-000000000038,Semil Shah,Founding General Partner,info@haystack.vc,https://linkedin.com/in/semilshah,true,false
+b0000001-0000-0000-0000-000000000043,a0000001-0000-0000-0000-000000000039,Aileen Lee,Founder & Managing Partner,info@cowboy.vc,https://linkedin.com/in/aileenlee,true,false
+b0000001-0000-0000-0000-000000000044,a0000001-0000-0000-0000-000000000040,Ron Conway,Founder & Special Advisor,info@svangel.com,https://linkedin.com/in/ronconway,true,false
+b0000001-0000-0000-0000-000000000045,a0000001-0000-0000-0000-000000000041,Matt Harris,Partner,info@baincapitalventures.com,https://linkedin.com/in/mattharris,true,false
+b0000001-0000-0000-0000-000000000046,a0000001-0000-0000-0000-000000000042,Michael Brown,General Partner,info@battery.com,https://linkedin.com/in/michaelbrown,true,false
+b0000001-0000-0000-0000-000000000047,a0000001-0000-0000-0000-000000000043,Nino Marakovic,CEO & Managing Director,info@sapphireventures.com,https://linkedin.com/in/ninomarakovic,true,false
+b0000001-0000-0000-0000-000000000048,a0000001-0000-0000-0000-000000000044,Mathias Schilling,Co-Founder & Managing Partner,info@headline.com,https://linkedin.com/in/mathiasschilling,true,false
+b0000001-0000-0000-0000-000000000049,a0000001-0000-0000-0000-000000000045,Pawel Chudzinski,Partner,team@pointnine.com,https://linkedin.com/in/pawelchudzinski,true,false
+b0000001-0000-0000-0000-000000000050,a0000001-0000-0000-0000-000000000046,Oliver Holle,CEO & Managing Partner,office@speedinvest.com,https://linkedin.com/in/oliverholle,true,false
+b0000001-0000-0000-0000-000000000051,a0000001-0000-0000-0000-000000000047,Staffan Helgesson,General Partner,info@creandum.com,https://linkedin.com/in/staffanhelgesson,true,false
+b0000001-0000-0000-0000-000000000052,a0000001-0000-0000-0000-000000000048,Filip Dames,Founding Partner,info@cherry.vc,https://linkedin.com/in/filipdames,true,false
+b0000001-0000-0000-0000-000000000053,a0000001-0000-0000-0000-000000000049,Niklas Zennstrom,CEO & Founding Partner,info@atomico.com,https://linkedin.com/in/niklaszennstrom,true,false
+b0000001-0000-0000-0000-000000000054,a0000001-0000-0000-0000-000000000050,Lyle Fong,Partner,info@eqtventures.com,https://linkedin.com/in/lylefong,true,false
+b0000001-0000-0000-0000-000000000055,a0000001-0000-0000-0000-000000000051,Robin Klein,General Partner,info@localglobe.vc,https://linkedin.com/in/robinklein,true,false
+b0000001-0000-0000-0000-000000000056,a0000001-0000-0000-0000-000000000052,Reshma Sohoni,Managing Partner,info@seedcamp.com,https://linkedin.com/in/reshmasohoni,true,false
+b0000001-0000-0000-0000-000000000057,a0000001-0000-0000-0000-000000000053,Hussein Kanji,Partner,info@hoxtonventures.com,https://linkedin.com/in/husseinkanji,true,false
+b0000001-0000-0000-0000-000000000058,a0000001-0000-0000-0000-000000000054,Jeff Bussgang,General Partner,info@flybridge.com,https://linkedin.com/in/jeffbussgang,true,false
+b0000001-0000-0000-0000-000000000059,a0000001-0000-0000-0000-000000000055,Gil Dibner,General Partner,info@angularventures.com,https://linkedin.com/in/gildibner,true,false
+b0000001-0000-0000-0000-000000000060,a0000001-0000-0000-0000-000000000056,Magnus Grimeland,Founder & CEO,apply@antler.co,https://linkedin.com/in/magnusgrimeland,true,true
+b0000001-0000-0000-0000-000000000061,a0000001-0000-0000-0000-000000000057,David Cohen,Co-Founder & Chairman,info@techstars.com,https://linkedin.com/in/davidcohen,true,false
+b0000001-0000-0000-0000-000000000062,a0000001-0000-0000-0000-000000000058,Vani Kola,Managing Director,info@kalaari.com,https://linkedin.com/in/vanikola,true,false
+b0000001-0000-0000-0000-000000000063,a0000001-0000-0000-0000-000000000059,Jishnu Bhattacharjee,Managing Director,info@nexusvp.com,https://linkedin.com/in/jishnub,true,false
+b0000001-0000-0000-0000-000000000064,a0000001-0000-0000-0000-000000000060,Pranav Pai,Founding Partner & CIO,info@3one4capital.com,https://linkedin.com/in/pranavpai,true,false
+b0000001-0000-0000-0000-000000000065,a0000001-0000-0000-0000-000000000061,Ritesh Banglani,Partner,info@stellarisvp.com,https://linkedin.com/in/riteshbanglani,true,false
+b0000001-0000-0000-0000-000000000066,a0000001-0000-0000-0000-000000000062,Sudhir Sethi,Founder & Chairman,info@chiratae.com,https://linkedin.com/in/sudhirsethi,true,false
+b0000001-0000-0000-0000-000000000067,a0000001-0000-0000-0000-000000000063,Anand Lunia,Founding Partner,info@indiaquotient.in,https://linkedin.com/in/anandlunia,true,false
+b0000001-0000-0000-0000-000000000068,a0000001-0000-0000-0000-000000000064,Manish Kheterpal,Managing Partner,info@waterbridge.vc,https://linkedin.com/in/manishkheterpal,true,false
+b0000001-0000-0000-0000-000000000069,a0000001-0000-0000-0000-000000000065,Vishesh Rajaram,Managing Partner,info@specialeinvest.com,https://linkedin.com/in/visheshrajaram,true,false
+b0000001-0000-0000-0000-000000000070,a0000001-0000-0000-0000-000000000066,Vaibhav Domkundwar,Founder & CEO,team@better.capital,https://linkedin.com/in/vaibhavdomkundwar,true,false
+b0000001-0000-0000-0000-000000000071,a0000001-0000-0000-0000-000000000067,Chris Sirise,Founding Partner,contact@saisoncapital.com,https://linkedin.com/in/chrissirise,true,false
+b0000001-0000-0000-0000-000000000072,a0000001-0000-0000-0000-000000000068,Paul Santos,Managing Partner,info@wavemaker.vc,https://linkedin.com/in/paulsantos,true,false
+b0000001-0000-0000-0000-000000000073,a0000001-0000-0000-0000-000000000069,Vinnie Lauria,Founding Partner,info@goldengate.vc,https://linkedin.com/in/vinnielauria,true,false
+b0000001-0000-0000-0000-000000000074,a0000001-0000-0000-0000-000000000070,Willson Cuaca,Co-Founder & Managing Partner,info@east.vc,https://linkedin.com/in/willsoncuaca,true,false
+b0000001-0000-0000-0000-000000000075,a0000001-0000-0000-0000-000000000071,Eric Acher,Managing Partner,contato@monashees.com.br,https://linkedin.com/in/ericacher,true,false
+b0000001-0000-0000-0000-000000000076,a0000001-0000-0000-0000-000000000072,Nicolas Szekasy,Co-Founder & Managing Partner,contact@kaszek.com,https://linkedin.com/in/nicolasszekasy,true,false
+b0000001-0000-0000-0000-000000000077,a0000001-0000-0000-0000-000000000073,Nigel Morris,Managing Partner,info@qedinvestors.com,https://linkedin.com/in/nigelmorris,true,false
+b0000001-0000-0000-0000-000000000078,a0000001-0000-0000-0000-000000000074,Micky Malka,Managing Partner,info@ribbitcap.com,https://linkedin.com/in/mickymalka,true,false
+b0000001-0000-0000-0000-000000000079,a0000001-0000-0000-0000-000000000075,Christian Drake,Partner,info@fin.capital,https://linkedin.com/in/christiandrake,true,false
+b0000001-0000-0000-0000-000000000080,a0000001-0000-0000-0000-000000000076,Amy Nauiokas,Founder & CEO,info@anthemis.com,https://linkedin.com/in/amynauiokas,true,false
+b0000001-0000-0000-0000-000000000081,a0000001-0000-0000-0000-000000000077,Matt Turck,Partner,team@deciens.com,https://linkedin.com/in/mattturck,true,false
+b0000001-0000-0000-0000-000000000082,a0000001-0000-0000-0000-000000000078,Hans Morris,Managing Partner,info@nyca.com,https://linkedin.com/in/hansmorris,true,false
+b0000001-0000-0000-0000-000000000083,a0000001-0000-0000-0000-000000000079,Rebecca Lynn,General Partner,info@canvas.vc,https://linkedin.com/in/rebeccalynn,true,false
+b0000001-0000-0000-0000-000000000084,a0000001-0000-0000-0000-000000000080,Matt Ocko,Co-Founder & Managing Partner,info@dcvc.com,https://linkedin.com/in/mattocko,true,false
+b0000001-0000-0000-0000-000000000085,a0000001-0000-0000-0000-000000000081,Peter Barrett,General Partner,info@playground.vc,https://linkedin.com/in/peterbarrett,true,false
+b0000001-0000-0000-0000-000000000086,a0000001-0000-0000-0000-000000000082,Danel Dayan,Partner,info@twosigmaventures.com,https://linkedin.com/in/daneldayan,true,false
+b0000001-0000-0000-0000-000000000087,a0000001-0000-0000-0000-000000000083,Jordan Jacobs,Managing Partner,info@radical.vc,https://linkedin.com/in/jordanjacobs,true,false
+b0000001-0000-0000-0000-000000000088,a0000001-0000-0000-0000-000000000084,Sunil Dhaliwal,General Partner,info@amplifypartners.com,https://linkedin.com/in/sunildhaliwal,true,false
+b0000001-0000-0000-0000-000000000089,a0000001-0000-0000-0000-000000000085,Ashu Garg,General Partner,info@foundationcapital.com,https://linkedin.com/in/ashugarg,true,false
+b0000001-0000-0000-0000-000000000090,a0000001-0000-0000-0000-000000000086,Jon Callaghan,Co-Founder,info@trueventures.com,https://linkedin.com/in/joncallaghan,true,false
+b0000001-0000-0000-0000-000000000091,a0000001-0000-0000-0000-000000000087,Vic Singh,General Partner,info@eniac.vc,https://linkedin.com/in/vicsingh,true,false
+b0000001-0000-0000-0000-000000000092,a0000001-0000-0000-0000-000000000088,Jeff Clavier,Founder & Managing Partner,info@uncorkcapital.com,https://linkedin.com/in/jeffclavier,true,false
+b0000001-0000-0000-0000-000000000093,a0000001-0000-0000-0000-000000000089,Mike Maples Jr,Partner,info@floodgate.com,https://linkedin.com/in/mikemaples,true,false
+b0000001-0000-0000-0000-000000000094,a0000001-0000-0000-0000-000000000090,Ben Lerer,Managing Partner,info@lererhippeau.com,https://linkedin.com/in/benlerer,true,false
+b0000001-0000-0000-0000-000000000095,a0000001-0000-0000-0000-000000000091,Dana Settle,Co-Founder & Managing Partner,info@greycroft.com,https://linkedin.com/in/danasettle,true,false
+b0000001-0000-0000-0000-000000000096,a0000001-0000-0000-0000-000000000092,David Tisch,Managing Partner,info@boxgroup.com,https://linkedin.com/in/davidtisch,true,false
+b0000001-0000-0000-0000-000000000097,a0000001-0000-0000-0000-000000000093,Joshua Kushner,Founder & Managing Partner,info@thrivecap.com,https://linkedin.com/in/joshuakushner,true,false
+b0000001-0000-0000-0000-000000000098,a0000001-0000-0000-0000-000000000094,Ankur Sagar,Managing Director,india@bvp.com,https://linkedin.com/in/ankursagar,true,false
+b0000001-0000-0000-0000-000000000099,a0000001-0000-0000-0000-000000000095,Rahul Taneja,Partner,india@lsvp.com,https://linkedin.com/in/rahultaneja,true,false
+b0000001-0000-0000-0000-000000000100,a0000001-0000-0000-0000-000000000100,Zachary Bratun-Glennon,Partner,info@gradient.com,https://linkedin.com/in/zacharybg,true,false

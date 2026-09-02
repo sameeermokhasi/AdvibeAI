@@ -1,0 +1,16 @@
+{
+  "name": "advibe-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Advibe — AI Investor Discovery & Relationship Operating System",
+  "scripts": {
+    "db-up": "docker compose up -d",
+    "db-down": "docker compose down",
+    "db-reset": "docker compose down -v && docker compose up -d",
+    "db-shell": "docker exec -it advibe-db psql -U advibe_user -d advibe",
+    "db-logs": "docker compose logs -f db",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && uvicorn main:app --reload --port 8000"
+  },
+  "keywords": ["ai", "investor-relations", "fastapi", "react", "postgresql"]
+}

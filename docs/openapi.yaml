@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Advibe API — AI Investor Discovery & Relationship OS
+  version: 1.0.0
+  description: |
+    Comprehensive backend API for Advibe: an autonomous AI Relationship Operating System 
+    for finding target investors, scoring thesis fit, generating hyper-personalized outreach, 
+    and managing closed-loop CRM outcomes.
+servers:
+  - url: http://localhost:8000
+    description: Local Development Server
+  - url: https://api.advibe.ai
+    description: Production Server
+
+paths:
+  /api/v1/intake:
+    post:
+      summary: Ingest Pitch Deck / Website and Initialize Company Profile
+      description: |
+        Accepts raw pitch deck text, website URL, or uploaded deck file. Uses Gemini LLM 
+        to extract the structured company profile (stage, sector, geography, check size, thesis)
+        and persists the company entity.
+      operationId: intakeCompany
+      tags:
+        - Intake
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntakeRequest'
+            example:
+              name: "FinFlow AI"
+              website_url: "https://finflow.ai"
+              raw_text: "FinFlow AI is raising a $1.5M Seed round to build real-time automated treasury workflows and cash reconciliation for fast-growing B2B companies."
+      responses:
+        '201':
+          description: Company profile successfully parsed and saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+              example:
+                id: "c1111111-0000-0000-0000-000000000001"
+                user_id: "u0000001-0000-0000-0000-000000000001"
+                name: "FinFlow AI"
+                website_url: "https://finflow.ai"
+                deck_file_url: null
+                stage: "Seed"
+                sector: "Fintech / B2B SaaS"
+                geography: "US + India"
+                check_size_min: 500000.0
+                check_size_max: 2000000.0
+                thesis_summary: "AI-powered treasury automation for mid-market CFOs, solving multi-entity cash reconciliation in real-time."
+                created_at: "2026-09-01T12:00:00Z"
+                updated_at: "2026-09-01T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422ValidationError'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/companies/{company_id}:
+    get:
+      summary: Retrieve Company Raise Profile
+      operationId: getCompany
+      tags:
+        - Intake
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: company_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "c1111111-0000-0000-0000-000000000001"
+      responses:
+        '200':
+          description: Company profile retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/match/{company_id}:
+    get:
+      summary: Generate Ranked Investor Matches with AI Fit Scoring
+      description: |
+        Executes dual-engine matching: rule-based multi-factor filtering + Gemini LLM scoring 
+        with specific rationale. Returns ranked investor firms with partner-level decision makers.
+      operationId: getMatches
+      tags:
+        - Match Engine
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: company_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "c1111111-0000-0000-0000-000000000001"
+      responses:
+        '200':
+          description: Successfully matched and ranked investors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchResponse'
+              example:
+                company_id: "c1111111-0000-0000-0000-000000000001"
+                total_candidates_analyzed: 20
+                matches_count: 5
+                matches:
+                  - investor_id: "a0000001-0000-0000-0000-000000000001"
+                    firm_name: "Sequoia Capital"
+                    fit_score: 94.5
+                    rule_based_score: 92.0
+                    llm_adjusted_score: 96.0
+                    rationale: "Strong alignment with Sequoia's active Seed focus on workflow infrastructure and B2B SaaS in the US/India corridor."
+                    fund_type: "Venture Capital"
+                    stage_focus: ["Seed", "Series A", "Series B", "Growth"]
+                    sector_focus: ["AI/ML", "B2B SaaS", "Fintech", "Developer Tools"]
+                    geography_focus: ["Global", "US", "Europe", "India"]
+                    typical_check_min: 1000000.0
+                    typical_check_max: 25000000.0
+                    website_url: "https://sequoiacap.com"
+                    decision_makers:
+                      - id: "b0000001-0000-0000-0000-000000000001"
+                        investor_id: "a0000001-0000-0000-0000-000000000001"
+                        full_name: "Roelof Botha"
+                        role_title: "Managing Partner"
+                        email: "roelof@sequoiacap.com"
+                        linkedin_url: "https://linkedin.com/in/roelofbotha"
+                        is_decision_maker: true
+                        verified: true
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/outreach/draft:
+    post:
+      summary: Generate Personalized Outreach Drafts for Selected Decision Makers
+      description: |
+        Creates a new campaign in 'draft' status and generates tailored first-touch messages
+        via Gemini AI referencing company thesis and specific investor focus.
+      operationId: createDrafts
+      tags:
+        - Outreach
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftRequest'
+            example:
+              company_id: "c1111111-0000-0000-0000-000000000001"
+              campaign_name: "Q3 Seed Raise - Tier 1 Partners"
+              channel: "email"
+              person_ids:
+                - "b0000001-0000-0000-0000-000000000001"
+                - "b0000001-0000-0000-0000-000000000003"
+      responses:
+        '201':
+          description: Campaign created and drafts generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+              example:
+                campaign_id: "cmp-0001-uuid"
+                campaign_name: "Q3 Seed Raise - Tier 1 Partners"
+                drafts_count: 2
+                drafts:
+                  - message_id: "msg-0001-uuid"
+                    campaign_id: "cmp-0001-uuid"
+                    person_id: "b0000001-0000-0000-0000-000000000001"
+                    investor_id: "a0000001-0000-0000-0000-000000000001"
+                    recipient_name: "Roelof Botha"
+                    recipient_role: "Managing Partner"
+                    recipient_email: "roelof@sequoiacap.com"
+                    firm_name: "Sequoia Capital"
+                    channel: "email"
+                    subject: "FinFlow AI // Seed Raise - Fintech & B2B SaaS"
+                    body: "Hi Roelof,\n\nFollowing Sequoia's focus on automated financial workflows, we are building FinFlow AI: real-time treasury automation for multi-entity businesses.\n\nWould you be open to a 15-minute conversation next week?\n\nBest regards,\nFounder, FinFlow AI"
+                    status: "draft"
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/outreach/send:
+    post:
+      summary: Send Batch of Approved Outreach Messages
+      description: |
+        Sends requested messages via Resend.
+        CRITICAL: Requires that message status is set to 'approved' by explicit user action.
+      operationId: sendBatch
+      tags:
+        - Outreach
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendBatchRequest'
+            example:
+              campaign_id: "cmp-0001-uuid"
+              message_ids:
+                - "msg-0001-uuid"
+      responses:
+        '200':
+          description: Batch dispatch processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendBatchResponse'
+              example:
+                campaign_id: "cmp-0001-uuid"
+                sent_count: 1
+                failed_count: 0
+                results:
+                  - message_id: "msg-0001-uuid"
+                    recipient_email: "roelof@sequoiacap.com"
+                    status: "sent"
+                    sent_at: "2026-09-01T12:30:00Z"
+                    error: null
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/webhook/reply:
+    post:
+      summary: Process Inbound Investor Email Webhook
+      description: |
+        Receives webhook payloads from Resend for inbound investor responses,
+        verifies HMAC signature, runs AI classification, and records the CRM outcome.
+      operationId: handleReplyWebhook
+      tags:
+        - Webhooks
+      security:
+        - WebhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookReplyPayload'
+            example:
+              from_email: "roelof@sequoiacap.com"
+              subject: "Re: FinFlow AI // Seed Raise - Fintech & B2B SaaS"
+              text: "Thanks for reaching out. We find your thesis very interesting. Are you free for a call this Thursday at 2pm PST?"
+              message_id_header: "<resend-msg-id-123@resend.dev>"
+      responses:
+        '200':
+          description: Webhook received and classified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outcome'
+              example:
+                id: "out-0001-uuid"
+                message_id: "msg-0001-uuid"
+                outcome_type: "meeting_requested"
+                reply_text: "Thanks for reaching out. We find your thesis very interesting. Are you free for a call this Thursday at 2pm PST?"
+                classified_by_llm: true
+                created_at: "2026-09-01T14:15:00Z"
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+  /api/v1/campaigns/{company_id}:
+    get:
+      summary: Get Campaigns, Message Deliveries, and CRM Outcomes
+      description: |
+        Returns the full relationship management pipeline including draft/sent messages,
+        delivery statuses, and classified investor outcomes (meetings, interested, etc.).
+      operationId: getCompanyCampaigns
+      tags:
+        - CRM & Campaigns
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: company_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "c1111111-0000-0000-0000-000000000001"
+      responses:
+        '200':
+          description: List of campaigns and CRM pipeline state.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CampaignStatus'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth JWT Token (`Authorization: Bearer <token>`)
+    WebhookSignature:
+      type: apiKey
+      name: X-Resend-Signature
+      in: header
+      description: Signed HMAC SHA256 signature for Resend Webhooks
+
+  schemas:
+    IntakeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "FinFlow AI"
+        website_url:
+          type: string
+          format: uri
+          example: "https://finflow.ai"
+        raw_text:
+          type: string
+          example: "FinFlow AI is raising $1.5M Seed..."
+        deck_file_url:
+          type: string
+          format: uri
+          example: "https://storage.supabase.co/decks/finflow_deck.pdf"
+
+    RaiseProfile:
+      type: object
+      required:
+        - name
+        - stage
+        - sector
+        - geography
+        - check_size_min
+        - check_size_max
+        - thesis_summary
+      properties:
+        name:
+          type: string
+        website_url:
+          type: string
+          nullable: true
+        stage:
+          type: string
+          example: "Seed"
+        sector:
+          type: string
+          example: "Fintech / B2B SaaS"
+        geography:
+          type: string
+          example: "US + India"
+        check_size_min:
+          type: number
+        check_size_max:
+          type: number
+        thesis_summary:
+          type: string
+
+    Company:
+      type: object
+      required:
+        - id
+        - user_id
+        - name
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        website_url:
+          type: string
+          nullable: true
+        deck_file_url:
+          type: string
+          nullable: true
+        stage:
+          type: string
+          nullable: true
+        sector:
+          type: string
+          nullable: true
+        geography:
+          type: string
+          nullable: true
+        check_size_min:
+          type: number
+          nullable: true
+        check_size_max:
+          type: number
+          nullable: true
+        thesis_summary:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Person:
+      type: object
+      required:
+        - id
+        - investor_id
+        - full_name
+      properties:
+        id:
+          type: string
+          format: uuid
+        investor_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        role_title:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        linkedin_url:
+          type: string
+          nullable: true
+        is_decision_maker:
+          type: boolean
+        verified:
+          type: boolean
+
+    InvestorMatch:
+      type: object
+      required:
+        - investor_id
+        - firm_name
+        - fit_score
+        - rule_based_score
+        - llm_adjusted_score
+        - rationale
+      properties:
+        investor_id:
+          type: string
+          format: uuid
+        firm_name:
+          type: string
+        fit_score:
+          type: number
+          minimum: 0
+          maximum: 100
+        rule_based_score:
+          type: number
+          minimum: 0
+          maximum: 100
+        llm_adjusted_score:
+          type: number
+          minimum: 0
+          maximum: 100
+        rationale:
+          type: string
+        fund_type:
+          type: string
+          nullable: true
+        stage_focus:
+          type: array
+          items:
+            type: string
+        sector_focus:
+          type: array
+          items:
+            type: string
+        geography_focus:
+          type: array
+          items:
+            type: string
+        typical_check_min:
+          type: number
+          nullable: true
+        typical_check_max:
+          type: number
+          nullable: true
+        website_url:
+          type: string
+          nullable: true
+        decision_makers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+
+    MatchResponse:
+      type: object
+      required:
+        - company_id
+        - total_candidates_analyzed
+        - matches_count
+        - matches
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        total_candidates_analyzed:
+          type: integer
+        matches_count:
+          type: integer
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvestorMatch'
+
+    DraftRequest:
+      type: object
+      required:
+        - company_id
+        - person_ids
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        person_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        campaign_name:
+          type: string
+          nullable: true
+        channel:
+          type: string
+          enum: [email, linkedin]
+          default: email
+
+    MessageDraft:
+      type: object
+      required:
+        - message_id
+        - campaign_id
+        - person_id
+        - investor_id
+        - recipient_name
+        - firm_name
+        - channel
+        - subject
+        - body
+        - status
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        campaign_id:
+          type: string
+          format: uuid
+        person_id:
+          type: string
+          format: uuid
+        investor_id:
+          type: string
+          format: uuid
+        recipient_name:
+          type: string
+        recipient_role:
+          type: string
+          nullable: true
+        recipient_email:
+          type: string
+          nullable: true
+        firm_name:
+          type: string
+        channel:
+          type: string
+          enum: [email, linkedin]
+        subject:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+          enum: [draft, approved, sent, failed]
+
+    DraftResponse:
+      type: object
+      required:
+        - campaign_id
+        - campaign_name
+        - drafts_count
+        - drafts
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        campaign_name:
+          type: string
+        drafts_count:
+          type: integer
+        drafts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageDraft'
+
+    SendBatchRequest:
+      type: object
+      required:
+        - campaign_id
+        - message_ids
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        message_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    SentMessageResult:
+      type: object
+      required:
+        - message_id
+        - recipient_email
+        - status
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        recipient_email:
+          type: string
+        status:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    SendBatchResponse:
+      type: object
+      required:
+        - campaign_id
+        - sent_count
+        - failed_count
+        - results
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        sent_count:
+          type: integer
+        failed_count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SentMessageResult'
+
+    WebhookReplyPayload:
+      type: object
+      required:
+        - from_email
+        - subject
+        - text
+      properties:
+        from_email:
+          type: string
+          format: email
+        subject:
+          type: string
+        text:
+          type: string
+        message_id_header:
+          type: string
+          nullable: true
+
+    Outcome:
+      type: object
+      required:
+        - id
+        - message_id
+        - outcome_type
+        - classified_by_llm
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        outcome_type:
+          type: string
+          enum: [no_reply, replied, interested, not_interested, meeting_requested, wrong_person]
+        reply_text:
+          type: string
+          nullable: true
+        classified_by_llm:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    MessageWithOutcome:
+      type: object
+      required:
+        - id
+        - recipient_name
+        - firm_name
+        - channel
+        - body
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipient_name:
+          type: string
+        recipient_email:
+          type: string
+          nullable: true
+        firm_name:
+          type: string
+        channel:
+          type: string
+          enum: [email, linkedin]
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        status:
+          type: string
+          enum: [draft, approved, sent, failed]
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+          nullable: true
+
+    CampaignStatus:
+      type: object
+      required:
+        - id
+        - company_id
+        - name
+        - status
+        - total_messages
+        - sent_messages
+        - interested_count
+        - meetings_requested_count
+        - messages
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, paused, completed]
+        total_messages:
+          type: integer
+        sent_messages:
+          type: integer
+        interested_count:
+          type: integer
+        meetings_requested_count:
+          type: integer
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageWithOutcome'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+        error_code:
+          type: string
+          nullable: true
+
+  responses:
+    400BadRequest:
+      description: Bad Request - Missing or invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    401Unauthorized:
+      description: Unauthorized - Invalid or expired authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    404NotFound:
+      description: Resource Not Found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    422ValidationError:
+      description: Unprocessable Entity - Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    500InternalError:
+      description: Internal Server Error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
