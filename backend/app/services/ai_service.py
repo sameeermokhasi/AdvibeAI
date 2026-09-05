@@ -55,7 +55,9 @@ class AIService:
 
         system_prompt = (
             "You are a top-tier venture capital analyst. Extract structured company fundraising "
-            "details from the provided startup pitch text. Respond with valid JSON only, no prose."
+            "details from the provided startup pitch text. If the text does not contain a specific pitch or thesis summary, "
+            "generate a compelling 1-2 sentence pitch/thesis based on the company details provided. "
+            "Respond with valid JSON only, no prose."
         )
 
         user_prompt = f"""
@@ -71,7 +73,7 @@ Return a JSON object with the exact keys:
   "geography": "Primary operational geography (e.g. US, Europe, India, Global)",
   "check_size_min": number (in USD),
   "check_size_max": number (in USD),
-  "thesis_summary": "1-2 sentence core investment thesis and value proposition"
+  "thesis_summary": "1-2 sentence core investment thesis and value proposition. Generate one if missing."
 }}
 """
         messages = [

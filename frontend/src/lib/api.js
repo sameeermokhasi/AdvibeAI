@@ -137,3 +137,13 @@ export async function getCampaigns(companyId) {
     method: 'GET'
   });
 }
+
+/**
+ * Retrieve all investors and their decision-makers
+ * GET /api/v1/investors
+ */
+export async function getInvestors() {
+  return request('/api/v1/investors', {
+    method: 'GET'
+  });
+}

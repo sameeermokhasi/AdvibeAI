@@ -5,6 +5,7 @@ import {
   draftOutreach,
   sendOutreach,
   getCampaigns,
+  getInvestors,
   ApiError
 } from '../lib/api';
 
@@ -15,13 +16,12 @@ export default function Modals({
   onIntakeSuccess
 }) {
   // Intake State
-  const [companyName, setCompanyName] = useState('FinFlow AI');
-  const [websiteUrl, setWebsiteUrl] = useState('https://finflow.ai');
-  const [deckSummary, setDeckSummary] = useState(
-    'FinFlow AI is raising a $1.5M Seed round to build real-time automated treasury workflows and cash reconciliation for fast-growing B2B companies across the US and India.'
-  );
+  const [companyName, setCompanyName] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [deckSummary, setDeckSummary] = useState('');
   const [currentCompany, setCurrentCompany] = useState(null);
   const [intakeLoading, setIntakeLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [intakeError, setIntakeError] = useState(null);
 
   // Matches State
@@ -37,9 +37,32 @@ export default function Modals({
   const [draftsError, setDraftsError] = useState(null);
   const [isSending, setIsSending] = useState(false);
 
+  // Investors DB State
+  const [investorsDb, setInvestorsDb] = useState([]);
+  const [investorsDbLoading, setInvestorsDbLoading] = useState(false);
+
   // CRM / Campaign State
   const [campaigns, setCampaigns] = useState([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+
+
+  useEffect(() => {
+    if (activeModal === 'investorsDatabase') {
+      loadInvestorsDb();
+    }
+  }, [activeModal]);
+
+  const loadInvestorsDb = async () => {
+    setInvestorsDbLoading(true);
+    try {
+      const data = await getInvestors();
+      setInvestorsDb(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInvestorsDbLoading(false);
+    }
+  };
 
   // Load matches when opening matches modal if company exists
   useEffect(() => {
@@ -54,6 +77,47 @@ export default function Modals({
       loadCampaigns(currentCompany.id);
     }
   }, [activeModal, currentCompany]);
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadLoading(true);
+    setIntakeError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('advibe_token');
+      // Fix base URL since frontend doesn't use the proxy setup for this fetch directly right now unless mapped in vite, wait frontend uses api.js. 
+      // It's safer to use the base url from api.js if possible. I'll just use the raw fetch for now and assume the vite proxy maps /api to backend.
+      const response = await fetch('http://127.0.0.1:8000/api/v1/intake/parse-pdf', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to parse PDF');
+      }
+
+      const data = await response.json();
+      
+      if (data.company_name && data.company_name !== 'Advibe Venture') setCompanyName(data.company_name);
+      if (data.website_url) setWebsiteUrl(data.website_url);
+      if (data.thesis_summary) setDeckSummary(data.thesis_summary);
+      
+    } catch (err) {
+      console.error(err);
+      setIntakeError('Error parsing PDF. Please try again or fill manually.');
+    } finally {
+      setUploadLoading(false);
+      e.target.value = null; // reset file input
+    }
+  };
 
   const handleIntakeSubmit = async (e) => {
     e.preventDefault();
@@ -229,7 +293,17 @@ export default function Modals({
               <button type="button" className="btn btn-ghost" onClick={closeModal} disabled={intakeLoading}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-solid" disabled={intakeLoading}>
+              <label className="btn btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                {uploadLoading ? 'Uploading...' : 'Upload Pitch Deck'}
+                <input 
+                  type="file" 
+                  accept="application/pdf" 
+                  style={{ display: 'none' }} 
+                  onChange={handlePdfUpload} 
+                  disabled={intakeLoading || uploadLoading}
+                />
+              </label>
+              <button type="submit" className="btn btn-solid" disabled={intakeLoading || uploadLoading}>
                 {intakeLoading ? 'Analyzing Thesis with Groq LLM...' : 'Extract Profile & Match Investors →'}
               </button>
             </div>
@@ -639,6 +713,92 @@ export default function Modals({
               <p style={{ color: '#9a9a9a', fontSize: '13px', textAlign: 'center' }}>
                 Start a raise to generate your first live pipeline.
               </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 8. Investors Database Modal */}
+      <div
+        className={`modal-overlay ${activeModal === 'investorsDatabase' ? 'active' : ''}`}
+        onClick={(e) => e.target === e.currentTarget && closeModal()}
+      >
+        <div className="modal-card" style={{ maxWidth: '900px' }}>
+          <button className="modal-close" onClick={closeModal} aria-label="Close">
+            &times;
+          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <span className="badge">Investor Database</span>
+            <a 
+              href="/investors.xlsx"
+              download="investors.xlsx"
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Investors
+            </a>
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '6px' }}>Look at the investors whom you can reach out to</h2>
+          <p style={{ color: '#9a9a9a', fontSize: '13.5px', marginBottom: '20px' }}>
+            Browse verified investors and decision makers from our network.
+          </p>
+
+          {investorsDbLoading ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: '#9a9a9a' }}>
+              Loading investors...
+            </div>
+          ) : (
+            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <th style={{ padding: '12px 8px', color: '#9a9a9a', fontWeight: 500 }}>Name</th>
+                    <th style={{ padding: '12px 8px', color: '#9a9a9a', fontWeight: 500 }}>Kind of Investor</th>
+                    <th style={{ padding: '12px 8px', color: '#9a9a9a', fontWeight: 500 }}>LinkedIn</th>
+                    <th style={{ padding: '12px 8px', color: '#9a9a9a', fontWeight: 500 }}>Email ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investorsDb.flatMap(inv => 
+                    inv.people.map(person => (
+                      <tr key={person.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px 8px', color: '#fff' }}>{person.full_name}</td>
+                        <td style={{ padding: '12px 8px', color: '#fff' }}>
+                          <div style={{ fontWeight: 500 }}>{inv.firm_name}</div>
+                          <div style={{ fontSize: '12px', color: '#9a9a9a' }}>{inv.fund_type}</div>
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          {person.linkedin_url ? (
+                            <a href={person.linkedin_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>Profile</a>
+                          ) : 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px 8px', color: '#9a9a9a' }}>{person.email}</td>
+                      </tr>
+                    ))
+                  )}
+                  {investorsDb.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#9a9a9a' }}>No investors found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

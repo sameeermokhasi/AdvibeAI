@@ -125,3 +125,30 @@ async def get_company(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Company with ID {company_id} not found."
     )
+
+from fastapi import UploadFile, File
+import fitz  # PyMuPDF
+
+@router.post(
+    "/intake/parse-pdf",
+    summary="Parse PDF Pitch Deck and Extract Profile"
+)
+async def parse_pdf(
+    file: UploadFile = File(...),
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    try:
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+        text = ""
+        for page in doc:
+            text += page.get_text()
+            
+        parsed_profile = AIService.extract_profile(text)
+        return parsed_profile
+    except Exception as e:
+        logger.error(f"Error parsing PDF: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to parse PDF: {str(e)}"
+        )

@@ -236,16 +236,16 @@ export default function App() {
               <button
                 className="btn btn-solid appear appear--btn"
                 style={{ '--d': '0.96s' }}
-                onClick={() => openModal('intake')}
+                onClick={() => openModal('investorsDatabase')}
               >
-                Start Your Raise
+                Look at the investors whom you can reach out to
               </button>
               <button
                 className="btn btn-ghost appear appear--side"
                 style={{ '--d': '1.10s' }}
-                onClick={() => openModal('demo')}
+                onClick={() => openModal('intake')}
               >
-                See how matching works
+                Start finding investors
               </button>
             </div>
           </div>
