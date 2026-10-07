@@ -14,6 +14,8 @@ Resilience Strategy:
 import re
 import time
 import json
+import math
+from collections import Counter
 from typing import List, Dict, Any, Optional, Union
 from app.core.llm_client import chat_completion_with_fallback
 from app.core.logging import logger, log_llm_call
@@ -26,6 +28,28 @@ VALID_SECTORS = [
     "AI/ML", "B2B SaaS", "Fintech", "Developer Tools", "Cybersecurity",
     "Healthtech", "Climate Tech", "Deeptech", "Crypto/Web3", "Consumer Tech"
 ]
+
+# Startup context signals — at least one must appear for LLM extraction to proceed
+_STARTUP_CONTEXT_SIGNALS = {
+    "seed", "pre-seed", "series", "raise", "raising", "funding", "startup",
+    "company", "product", "platform", "software", "saas", "ai", "fintech",
+    "healthtech", "solution", "service", "business", "market", "revenue",
+    "investors", "venture", "capital", "mrr", "arr", "traction", "b2b", "b2c"
+}
+
+
+def _is_meaningful_pitch_text(text: str) -> bool:
+    """
+    Returns True only if the text has enough signal to extract a startup profile.
+    Prevents the LLM from hallucinating profiles from gibberish inputs.
+    """
+    if not text or len(text.strip()) < 20:
+        return False
+    words = [w.lower().strip('.,!?;:"') for w in text.split() if len(w) > 1]
+    if len(words) < 4:
+        return False
+    # Must contain at least one recognizable startup context signal
+    return any(w in _STARTUP_CONTEXT_SIGNALS for w in words)
 
 
 def sanitize_input(text: str, max_length: int = 6000) -> str:
@@ -51,6 +75,15 @@ class AIService:
         Used by POST /api/v1/intake.
         """
         sanitized = sanitize_input(raw_text, max_length=6000)
+
+        # Input quality gate: reject gibberish before wasting LLM tokens
+        if not _is_meaningful_pitch_text(sanitized):
+            logger.warning(f"extract_profile rejected low-signal input (len={len(sanitized)}): '{sanitized[:60]}'")
+            raise ValueError(
+                "The provided text doesn't contain enough startup context to extract a profile. "
+                "Please include your company description, funding stage, sector, and raise amount."
+            )
+
         start_t = time.perf_counter()
 
         system_prompt = (

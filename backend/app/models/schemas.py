@@ -27,6 +27,11 @@ class OutcomeType(str, Enum):
     MEETING_REQUESTED = "meeting_requested"
     WRONG_PERSON = "wrong_person"
 
+class RaiseTrack(str, Enum):
+    VENTURE = "venture"
+    REAL_ESTATE = "real_estate"
+    FUND_LP = "fund_lp"
+
 class IntakeProfile(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -238,3 +243,143 @@ class CampaignStatusOut(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
+
+# ============================================================================
+# Advibe V2 Parity Schemas (8raise Feature Scope)
+# ============================================================================
+
+class AddyChatRequest(BaseModel):
+    message: str = Field(..., examples=["Find seed VCs in the US that back fintech and AI"])
+    company_id: Optional[str] = None
+    step: Optional[str] = Field("discover", examples=["brief", "discover", "dossier", "pulse"])
+    conversation_id: Optional[str] = None
+    track: Optional[RaiseTrack] = RaiseTrack.VENTURE
+
+class AddySearchPreview(BaseModel):
+    detected_track: RaiseTrack
+    filters_detected: Dict[str, Any]
+    leads_estimate: int
+    sparks_cost: float
+    summary: str
+    sample_leads: List[Dict[str, Any]] = []
+
+class AddyChatResponse(BaseModel):
+    reply: str
+    step: str
+    requires_confirmation: bool = False
+    search_preview: Optional[AddySearchPreview] = None
+    structured_profile: Optional[Dict[str, Any]] = None
+    leads_delivered: Optional[List[Dict[str, Any]]] = None
+    sparks_spent: float = 0.0
+    remaining_sparks: float = 10.0
+    remaining_addy_messages: int = 25
+
+class SearchPreviewRequest(BaseModel):
+    query: str
+    track: RaiseTrack = RaiseTrack.VENTURE
+    company_id: Optional[str] = None
+
+class SearchConfirmRequest(BaseModel):
+    query: str
+    track: RaiseTrack = RaiseTrack.VENTURE
+    company_id: Optional[str] = None
+    filters: Optional[Dict[str, Any]] = None
+    sparks_cost: float = 5.0
+    enrichment_level: Optional[str] = "standard"  # "basic" | "standard" | "full"
+
+class TwinFinderCompsRequest(BaseModel):
+    brief: str = Field(..., examples=["An AI code-review tool for engineering teams. Raising seed in the US."])
+    track: Optional[RaiseTrack] = RaiseTrack.VENTURE
+
+class ComparableCompany(BaseModel):
+    id: str
+    name: str
+    stage: str
+    sector: str
+    description: str
+    funding_amount: str
+    lead_investors: List[str] = []
+
+class TwinFinderCompsResponse(BaseModel):
+    brief: str
+    comparables_count: int
+    comparables: List[ComparableCompany]
+
+class LookalikeFirm(BaseModel):
+    firm_name: str
+    why_it_fits: str
+    funded_stage: str
+    active: bool = True
+    score: int = 90
+    check_size: str = "$500K - $3M"
+    partners_count: int = 3
+
+class TwinFinderFirmsResponse(BaseModel):
+    brief: str
+    firms_count: int
+    firms: List[LookalikeFirm]
+
+class ResolvePasteRequest(BaseModel):
+    firm_names: str = Field(..., examples=["Sequoia Capital\nAndreessen Horowitz\nBessemer Venture Partners\nForerunner Ventures\nLerer Hippeau"])
+    track: Optional[RaiseTrack] = RaiseTrack.VENTURE
+
+class ResolvedLead(BaseModel):
+    firm_name: str
+    partner_name: str
+    role_title: str
+    verified_email: str
+    linkedin_url: str
+    is_placement_agent: bool = False
+    aum_display: str
+    stage_focus: List[str] = []
+    verified: bool = True
+
+class ResolveBatchResponse(BaseModel):
+    batch_id: str
+    total_firms: int
+    enriched_count: int
+    placement_agents_filtered: int
+    results: List[ResolvedLead]
+
+class PulseRollup(BaseModel):
+    found: int = 25
+    contacted: int = 19
+    replied: int = 3
+    meetings_booked: int = 1
+    reply_rate: str = "15.8%"
+    meeting_rate: str = "5.3%"
+    timeline_events: List[Dict[str, Any]] = []
+
+class UserAccountOut(BaseModel):
+    id: str
+    email: str
+    plan_tier: str = "free_trial"
+    billing_interval: str = "monthly"
+    sparks_balance: float = 10.0
+    sparks_monthly_quota: float = 10.0
+    addy_messages_balance: int = 25
+    playbook_claims_balance: int = 1
+    discount_claimed: bool = False
+    team_seats: int = 1
+    workspace_name: str = "General"
+
+class ClaimDiscountRequest(BaseModel):
+    plan_tier: str = "solo"
+    billing_interval: str = "monthly"
+
+class LiveStatsOut(BaseModel):
+    total_investors_catalog: int
+    cross_referenced_sources: int
+    active_companies_count: int
+    avg_ranked_matches: int
+
+class PlaybookResourceOut(BaseModel):
+    id: str
+    title: str
+    category: str
+    description: str
+    is_guide: bool
+    required_plan_tier: str
+    download_url: Optional[str] = None
+    items_count: int = 0
+    is_claimed: bool = False

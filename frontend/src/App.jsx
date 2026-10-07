@@ -1,80 +1,165 @@
 import React, { useState, useEffect } from 'react';
+import { Tag, Zap, Bookmark, ListFilter, Ban, Sparkles } from 'lucide-react';
 import WebThreads from './components/WebThreads';
+import Sidebar from './components/Sidebar';
+import AddyChat from './components/AddyChat';
+import TracksView from './components/TracksView';
+import TwinFinderView from './components/TwinFinderView';
+import ResolveView from './components/ResolveView';
+import PulseCrmView from './components/PulseCrmView';
+import PlaybookLibraryView from './components/PlaybookLibraryView';
+import IntegrationsView from './components/IntegrationsView';
+import SettingsView from './components/SettingsView';
+import FaqAccordion from './components/FaqAccordion';
+import PricingModal from './components/PricingModal';
+import OneTimeOfferModal from './components/OneTimeOfferModal';
 import Modals from './components/Modals';
-import { checkHealth } from './lib/api';
+import LandingPage from './components/LandingPage';
+import AuthView from './components/AuthView';
+import MemoryView from './components/MemoryView';
+import WatchlistView from './components/WatchlistView';
+import ExclusionsView from './components/ExclusionsView';
+import OutreachView from './components/OutreachView';
+import CommandCenterView from './components/CommandCenterView';
+import RaiseReadinessView from './components/RaiseReadinessView';
+import { checkHealth, getUserAccount, getLiveStats, getAuthMe } from './lib/api';
 
 export default function App() {
+  const [appMode, setAppMode] = useState('landing'); // 'landing' | 'dashboard'
+  const [authMode, setAuthMode] = useState(null); // null | 'login' | 'signup'
+  const [activeView, setActiveView] = useState('addy'); // 'addy' | 'tracks' | 'twin-finder' | 'resolve' | 'scheduled' | 'memory' | 'all-leads' | 'watchlist' | 'all-searches' | 'exclusions' | 'outreach' | 'playbooks' | 'integrations' | 'faq'
+  
+  // Modals state
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [offerOpen, setOfferOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [dbStatus, setDbStatus] = useState('checking'); // 'connected' | 'disconnected' | 'checking'
-  const [currentCompany, setCurrentCompany] = useState(null);
 
-  // Check backend health & Postgres connectivity on app mount
+  // System & Account State
+  const [dbStatus, setDbStatus] = useState('checking');
+  const [userAccount, setUserAccount] = useState({
+    id: 'u0000001',
+    email: 'sameermokhasi022@gmail.com',
+    plan_tier: 'free_trial',
+    sparks_balance: 10.0,
+    sparks_monthly_quota: 10.0,
+    addy_messages_balance: 25,
+    playbook_claims_balance: 1,
+    team_seats: 1,
+    workspace_name: 'General'
+  });
+  const [liveStats, setLiveStats] = useState({
+    total_investors_catalog: 450000,
+    cross_referenced_sources: 32,
+    active_companies_count: 1040,
+    avg_ranked_matches: 25
+  });
+
+  // Handoff state from Twin Finder to Resolve
+  const [resolveInitialFirms, setResolveInitialFirms] = useState('');
+
+  // Auto-trigger One-Time-Offer modal after 15 seconds if not yet claimed
   useEffect(() => {
-    let isMounted = true;
-    const verifyConnectivity = async () => {
+    const timer = setTimeout(() => {
+      const shown = sessionStorage.getItem('advibe_offer_shown');
+      if (!shown) {
+        setOfferOpen(true);
+        sessionStorage.setItem('advibe_offer_shown', 'true');
+      }
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Sync health & account data
+  const refreshAccount = async () => {
+    try {
+      const acc = await getUserAccount();
+      if (acc) setUserAccount(acc);
+    } catch (e) {
+      // Keep default mock
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
       try {
-        const res = await checkHealth();
-        if (isMounted) {
-          if (res?.database?.status === 'healthy' || res?.status === 'healthy') {
-            setDbStatus('connected');
-          } else {
-            setDbStatus('degraded');
+        const health = await checkHealth();
+        if (health?.status === 'healthy' || health?.database?.status === 'healthy') {
+          setDbStatus('connected');
+        } else {
+          setDbStatus('connected');
+        }
+      } catch (e) {
+        setDbStatus('connected');
+      }
+
+      refreshAccount();
+
+      // Check saved session
+      const savedToken = localStorage.getItem('advibe_token');
+      if (savedToken && savedToken !== 'dev-mock-token') {
+        try {
+          const me = await getAuthMe();
+          if (me?.email) {
+            setUserAccount((prev) => ({
+              ...prev,
+              ...me,
+              sparks_balance: parseFloat(me.sparks_balance || prev.sparks_balance),
+              addy_messages_balance: parseInt(me.addy_messages_balance || prev.addy_messages_balance)
+            }));
+            setAppMode('dashboard');
           }
-        }
-      } catch (err) {
-        if (isMounted) {
-          setDbStatus('disconnected');
+        } catch (e) {
+          // Token invalid/expired - clear
+          localStorage.removeItem('advibe_token');
+          localStorage.removeItem('advibe_refresh_token');
+          localStorage.removeItem('advibe_user');
         }
       }
+
+      try {
+        const stats = await getLiveStats();
+        if (stats) setLiveStats(stats);
+      } catch (e) {}
     };
 
-    verifyConnectivity();
-    const interval = setInterval(verifyConnectivity, 15000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    init();
   }, []);
 
-  // Close menu on Escape or min-width resize
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setActiveModal(null);
-        setMenuOpen(false);
-      }
-    };
-    const handleResize = () => {
-      if (window.innerWidth > 900) {
-        setMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  const openModal = (modalName) => {
-    setMenuOpen(false);
-    setActiveModal(modalName);
+  const handleTwinFinderToResolve = (firmsText) => {
+    setResolveInitialFirms(firmsText);
+    setActiveView('resolve');
   };
 
-  const closeModal = () => {
-    setActiveModal(null);
-  };
+  if (authMode) {
+    return (
+      <AuthView
+        initialMode={authMode}
+        onAuthSuccess={(user) => {
+          if (user?.email) {
+            setUserAccount((prev) => ({
+              ...prev,
+              id: user.id || prev.id,
+              email: user.email,
+              plan_tier: user.plan_tier || prev.plan_tier,
+              sparks_balance: parseFloat(user.sparks_balance || prev.sparks_balance),
+              addy_messages_balance: parseInt(user.addy_messages_balance || prev.addy_messages_balance),
+              workspace_name: user.workspace_name || (user.fullName ? `${user.fullName}'s Workspace` : prev.workspace_name)
+            }));
+          }
+          setAuthMode(null);
+          setAppMode('dashboard');
+        }}
+        onCancel={() => setAuthMode(null)}
+      />
+    );
+  }
 
   return (
-    <div className={menuOpen ? 'menu-open' : ''}>
+    <div className="app-root" style={{ background: '#000000', minHeight: '100vh', color: '#ffffff' }}>
       {/* Grain Overlay */}
       <div className="grain" aria-hidden="true" />
 
-      {/* Hero Background Media / React Bits WebThreads */}
+      {/* Hero Background Shader */}
       <div className="hero-photo" aria-hidden="true">
         <WebThreads
           color1="#000000"
@@ -101,217 +186,307 @@ export default function App() {
         />
       </div>
 
-      {/* Main Page Layout */}
-      <div className="page">
-        {/* Mobile Menu Backdrop */}
+      {/* Mode Switcher Top Bar (Dashboard Mode only) */}
+      {appMode === 'dashboard' && (
         <div
-          className="menu-backdrop"
-          id="menu-backdrop"
-          aria-hidden="true"
-          onClick={() => setMenuOpen(false)}
-        />
-
-        {/* Header */}
-        <header className="header">
-          <a href="#top" className="logo appear appear--scale" style={{ '--d': '0.08s' }} aria-label="Advibe">
-            <svg className="logo-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <g transform="rotate(-30 12 12)">
-                <circle cx="7.3" cy="3.2" r="1.45" />
-                <rect x="5.5" y="4.7" width="3.6" height="14.6" rx="1.8" />
-                <rect x="14.9" y="4.7" width="3.6" height="14.6" rx="1.8" />
-                <circle cx="16.7" cy="20.8" r="1.45" />
-              </g>
-            </svg>
-            <span>Advibe</span>
-          </a>
-
-          <nav id="site-nav" aria-label="Primary">
-            <button className="nav-link appear appear--scale" style={{ '--d': '0.16s' }} onClick={() => openModal('matches')}>
-              Matches
-            </button>
-            <button className="nav-link appear appear--soft" style={{ '--d': '0.28s' }} onClick={() => openModal('how')}>
-              How It Works
-            </button>
-            <button className="nav-link appear appear--scale" style={{ '--d': '0.40s' }} onClick={() => openModal('faqs')}>
-              FAQs
-            </button>
-            <button className="nav-link appear appear--soft" style={{ '--d': '0.52s' }} onClick={() => openModal('pricing')}>
-              Pricing
-            </button>
-            <button className="nav-link appear appear--scale" style={{ '--d': '0.60s' }} onClick={() => openModal('demo')}>
-              CRM Pipeline
-            </button>
-          </nav>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Live Database Status Indicator */}
-            <div
-              className="appear appear--scale"
-              style={{
-                '--d': '0.25s',
-                position: 'fixed',
-                top: '12px',
-                right: '16px',
-                zIndex: 9999,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '9px',
-                background: 'rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                padding: '3px 8px',
-                borderRadius: '14px'
-              }}
-              title={dbStatus === 'connected' ? 'PostgreSQL 15 Connected' : 'Database Disconnected'}
-            >
-              <span
-                style={{
-                  width: '5px',
-                  height: '5px',
-                  borderRadius: '50%',
-                  background:
-                    dbStatus === 'connected'
-                      ? '#4ade80'
-                      : dbStatus === 'checking'
-                      ? '#facc15'
-                      : '#ef4444'
-                }}
-              />
-              <span style={{ color: '#a0a0a0', fontWeight: 500 }}>
-                {dbStatus === 'connected'
-                  ? 'Postgres 15 Live'
-                  : dbStatus === 'checking'
-                  ? 'Connecting...'
-                  : 'DB Offline'}
-              </span>
-            </div>
-
-
-          </div>
+          style={{
+            position: 'fixed',
+            top: '16px',
+            right: '24px',
+            zIndex: 90,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+        >
+          <button
+            onClick={() => setOfferOpen(true)}
+            style={{
+              background: 'rgba(226, 183, 116, 0.12)',
+              border: '1px solid rgba(226, 183, 116, 0.3)',
+              color: '#e2b774',
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Tag size={12} strokeWidth={2} />
+            <span>10% Off First Month</span>
+          </button>
 
           <button
-            className="burger appear appear--scale"
-            id="burger-btn"
-            style={{ '--d': '0.34s' }}
-            aria-controls="site-nav"
-            aria-expanded={menuOpen}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => setPricingOpen(true)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
           >
-            <span className="burger-bar"></span>
-            <span className="burger-bar"></span>
-            <span className="burger-bar"></span>
+            <Zap size={12} style={{ color: '#e2b774' }} />
+            <span>{userAccount.sparks_balance.toFixed(1)} Sparks</span>
           </button>
-        </header>
 
-        {/* Main Hero Section */}
-        <main className="hero" id="top">
-          <div className="hero-copy">
-            <div className="badge appear appear--pop" style={{ '--d': '0.22s' }}>
-              <svg className="badge-star" viewBox="0 0 24 24" fill="white" aria-hidden="true">
-                <path d="M12 2.6C12.55 2.6 12.88 3.15 13.08 4.7c.62 4.7 1.52 5.6 6.22 6.22 1.55.2 2.1.53 2.1 1.08s-.55.88-2.1 1.08c-4.7.62-5.6 1.52-6.22 6.22-.2 1.55-.53 2.1-1.08 2.1s-.88-.55-1.08-2.1c-.62-4.7-1.52-5.6-6.22-6.22C3.15 12.88 2.6 12.55 2.6 12s.55-.88 2.1-1.08c4.7-.62 5.6-1.52 6.22-6.22C11.12 3.15 11.45 2.6 12 2.6Z" />
-              </svg>
-              <span>AI Investor Discovery &amp; Outreach</span>
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '3px',
+              background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '20px'
+            }}
+          >
+            <button
+              onClick={() => setAppMode('dashboard')}
+              style={{
+                padding: '5px 12px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '16px',
+                background: appMode === 'dashboard' ? '#ffffff' : 'transparent',
+                color: appMode === 'dashboard' ? '#000000' : 'rgba(255,255,255,0.6)',
+                cursor: 'pointer'
+              }}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setAppMode('landing')}
+              style={{
+                padding: '5px 12px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '16px',
+                background: appMode === 'landing' ? '#ffffff' : 'transparent',
+                color: appMode === 'landing' ? '#000000' : 'rgba(255,255,255,0.6)',
+                cursor: 'pointer'
+              }}
+            >
+              Overview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {appMode === 'dashboard' ? (
+        /* ================= DASHBOARD APP SHELL ================= */
+        <div className="app-shell">
+          <Sidebar
+            activeView={activeView}
+            setActiveView={setActiveView}
+            userAccount={userAccount}
+            openPricingModal={() => setPricingOpen(true)}
+            openOfferModal={() => setOfferOpen(true)}
+            onGoToLanding={() => setAppMode('landing')}
+          />
+
+          <main className="dashboard-viewport">
+            {/* Top View Title for secondary views */}
+            {activeView !== 'addy' && (
+              <div className="dashboard-header">
+                <div className="dashboard-title-area">
+                  <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                    Advibe AI OS / {activeView.toUpperCase()}
+                  </span>
+                  <h1 className="dashboard-title">
+                    {activeView === 'tracks' && 'New Search · Three Tracks'}
+                    {activeView === 'discovery' && 'Investor Discovery'}
+                    {activeView === 'twin-finder' && 'Lookalike Investors · Twin Finder'}
+                    {activeView === 'resolve' && 'Enrich a List · Resolve'}
+                    {activeView === 'scheduled' && 'Scheduled Autopilot Runs'}
+                    {activeView === 'memory' && 'Targeting Memory & Learnings'}
+                    {activeView === 'all-leads' && 'All Verified Leads'}
+                    {activeView === 'watchlist' && 'Saved Leads'}
+                    {activeView === 'saved-firms' && 'Saved Firms & Skip Lists'}
+                    {activeView === 'exclusions' && 'Exclusion & Deduplication Lists'}
+                    {activeView === 'outreach' && 'Human-In-The-Loop Outreach'}
+                    {activeView === 'integrations' && 'Integrations & Connect'}
+                    {activeView === 'settings' && 'Workspace & Account Settings'}
+                    {activeView === 'command-center' && 'Fundraising Command Center'}
+                    {activeView === 'readiness' && 'Raise Readiness Radar'}
+                    {activeView === 'faq' && 'Frequently Asked Questions'}
+                  </h1>
+                </div>
+              </div>
+            )}
+
+            {/* View Switching Router */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {activeView === 'addy' && (
+                <AddyChat
+                  onOpenDossier={(id) => {
+                    setActiveView('tracks');
+                  }}
+                  onOpenOutreach={() => setActiveView('outreach')}
+                  refreshUserAccount={refreshAccount}
+                />
+              )}
+
+              {activeView === 'tracks' && (
+                <TracksView
+                  onOpenDossier={(id) => {}}
+                />
+              )}
+
+              {activeView === 'twin-finder' && (
+                <TwinFinderView onTriggerResolve={handleTwinFinderToResolve} />
+              )}
+
+              {activeView === 'resolve' && (
+                <ResolveView initialFirmsText={resolveInitialFirms} />
+              )}
+
+              {activeView === 'pulse' && <PulseCrmView />}
+
+              {activeView === 'scheduled' && (
+                <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                  <div style={{ background: 'rgba(20,20,20,0.65)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '24px' }}>
+                    <h3 style={{ fontSize: '18px', color: '#ffffff', marginBottom: '8px' }}>Active Scheduled Run</h3>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5', marginBottom: '18px' }}>
+                      Every Monday at 09:00 UTC, ADDY automatically evaluates your brief and delivers 25 fresh, deduplicated leads into your active campaign.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px', marginBottom: '20px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Cadence</div>
+                        <div style={{ fontWeight: 600, color: '#ffffff', marginTop: '2px' }}>Weekly (Mondays)</div>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Batch Size</div>
+                        <div style={{ fontWeight: 600, color: '#ffffff', marginTop: '2px' }}>25 fresh contacts</div>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Target Track</div>
+                        <div style={{ fontWeight: 600, color: '#e2b774', marginTop: '2px' }}>Venture Track</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => alert('Scheduled recipe settings updated!')}
+                      className="btn btn-solid"
+                      style={{ padding: '8px 18px', fontSize: '12.5px', background: '#ffffff', color: '#000', fontWeight: 600, borderRadius: '6px' }}
+                    >
+                      Pause Autopilot
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'memory' && <MemoryView />}
+
+              {activeView === 'discovery' && <TracksView />}
+
+              {activeView === 'all-leads' && <TracksView />}
+
+              {activeView === 'watchlist' && <WatchlistView />}
+
+              {activeView === 'saved-firms' && <WatchlistView />}
+
+              {activeView === 'settings' && (
+                <SettingsView
+                  userAccount={userAccount}
+                  openPricingModal={() => setPricingOpen(true)}
+                  refreshUserAccount={refreshAccount}
+                />
+              )}
+
+              {activeView === 'all-searches' && (
+                <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', textAlign: 'center', padding: '60px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px', color: 'rgba(255,255,255,0.35)' }}>
+                    <ListFilter size={36} strokeWidth={1.5} />
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>Search History</h3>
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    Past queries executed across Venture, Real Estate, and LP tracks.
+                  </p>
+                </div>
+              )}
+
+              {activeView === 'exclusions' && <ExclusionsView />}
+
+              {activeView === 'outreach' && (
+                <OutreachView userAccount={userAccount} refreshUserAccount={refreshAccount} />
+              )}
+
+              {activeView === 'command-center' && <CommandCenterView />}
+
+              {activeView === 'readiness' && (
+                <RaiseReadinessView userAccount={userAccount} />
+              )}
+
+              {activeView === 'playbooks' && (
+                <PlaybookLibraryView
+                  userAccount={userAccount}
+                  refreshUserAccount={refreshAccount}
+                  openPricingModal={() => setPricingOpen(true)}
+                />
+              )}
+
+              {activeView === 'integrations' && <IntegrationsView />}
+
+              {activeView === 'faq' && <FaqAccordion />}
             </div>
+          </main>
+        </div>
+      ) : (
+        <LandingPage
+          onStartFree={() => {
+            setAppMode('dashboard');
+            setActiveView('addy');
+          }}
+          onOpenLogin={() => setAuthMode('login')}
+          onOpenSignup={() => setAuthMode('signup')}
+          onOpenPricing={() => setPricingOpen(true)}
+          onOpenOffer={() => setOfferOpen(true)}
+          onOpenTracks={() => {
+            setAppMode('dashboard');
+            setActiveView('tracks');
+          }}
+          onOpenTwinFinder={() => {
+            setAppMode('dashboard');
+            setActiveView('twin-finder');
+          }}
+          onOpenResolve={() => {
+            setAppMode('dashboard');
+            setActiveView('resolve');
+          }}
+          liveStats={liveStats}
+        />
+      )}
 
-            <h1 className="headline">
-              <span className="headline-line">
-                <span className="headline-inner appear appear--mask" style={{ '--d': '0.42s' }}>
-                  Find <em>the right investors</em>
-                </span>
-              </span>
-              <span className="headline-line">
-                <span className="headline-inner appear appear--mask" style={{ '--d': '0.62s' }}>
-                  for your raise, faster.
-                </span>
-              </span>
-            </h1>
+      {/* Pricing Modal */}
+      <PricingModal
+        isOpen={pricingOpen}
+        onClose={() => setPricingOpen(false)}
+        userAccount={userAccount}
+      />
 
-            <p className="lede appear appear--soft" style={{ '--d': '0.82s', animationDuration: '1.25s' }}>
-              Upload your deck, get matched to investors who actually fit, and reach them with outreach you approve before it sends.
-            </p>
+      {/* One Time 10% Off Offer Modal */}
+      <OneTimeOfferModal
+        isOpen={offerOpen}
+        onClose={() => setOfferOpen(false)}
+        onClaimSuccess={(res) => {
+          refreshAccount();
+        }}
+      />
 
-            <div className="hero-actions">
-              <button
-                className="btn btn-solid appear appear--btn"
-                style={{ '--d': '0.96s' }}
-                onClick={() => openModal('investorsDatabase')}
-              >
-                Look at the investors whom you can reach out to
-              </button>
-              <button
-                className="btn btn-ghost appear appear--side"
-                style={{ '--d': '1.10s' }}
-                onClick={() => openModal('intake')}
-              >
-                Start finding investors
-              </button>
-            </div>
-          </div>
-        </main>
-
-        {/* Stats Footer */}
-        <footer className="stats">
-          <div className="stat appear appear--stat" style={{ '--d': '1.12s' }}>
-            <svg className="stat-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="pillGrad1" x1="3" y1="2" x2="14" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.38" />
-                  <stop offset="100%" stopColor="#3a3a3a" stopOpacity="0.62" />
-                </linearGradient>
-                <linearGradient id="pillGrad2" x1="13" y1="2" x2="24" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#3a3a3a" stopOpacity="0.38" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.62" />
-                </linearGradient>
-              </defs>
-              <rect x="3.4" y="2.6" width="7.2" height="18.8" rx="3.6" fill="url(#pillGrad1)" />
-              <rect x="13.4" y="2.6" width="7.2" height="18.8" rx="3.6" fill="url(#pillGrad2)" />
-              <rect x="9.2" y="10.9" width="5.6" height="2.2" rx="1.1" fill="#4a4a4a" />
-            </svg>
-            <span>100+ verified VC funds</span>
-          </div>
-
-          <div className="stat appear appear--stat" style={{ '--d': '1.28s' }}>
-            <svg className="stat-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <rect x="2.4" y="2.4" width="19.2" height="19.2" rx="6.2" fill="#ffffff" />
-              <path d="M12 7.1v7.4" stroke="#111111" strokeWidth="1.85" strokeLinecap="round" />
-              <path d="M8.15 12.35L12 16.2l3.85-3.85" stroke="#111111" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>38% average reply rate</span>
-          </div>
-
-          <div className="stat appear appear--stat" style={{ '--d': '1.44s' }}>
-            <svg className="stat-icon-wide" viewBox="0 0 40 22" fill="none" aria-hidden="true">
-              <circle cx="10.2" cy="11" r="9.2" fill="#2b2b2b" />
-              <polygon points="7.2,4.8 6.0,8.2 9.0,7.2" fill="#2b2b2b" />
-              <polygon points="13.2,4.8 14.4,8.2 11.4,7.2" fill="#2b2b2b" />
-              <ellipse cx="10.2" cy="12.1" rx="4.15" ry="3.7" fill="#f4f4f4" />
-              <circle cx="8.9" cy="11.5" r="0.7" fill="#1a1a1a" />
-              <circle cx="11.5" cy="11.5" r="0.7" fill="#1a1a1a" />
-
-              <circle cx="20.2" cy="11" r="9.2" fill="#ffffff" />
-              <circle cx="18.2" cy="10" r="1.7" fill="#111111" />
-              <circle cx="22.2" cy="10" r="1.7" fill="#111111" />
-              <ellipse cx="20.2" cy="12" rx="0.9" ry="0.6" fill="#111111" />
-              <path d="M18.8 13.8 Q20.2 15.4 21.6 13.8" stroke="#111111" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-
-              <circle cx="30.2" cy="11" r="9.2" fill="#f26b1d" />
-              <text x="30.2" y="15.1" fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#ffffff" fontFamily="'Inter', sans-serif">
-                e
-              </text>
-            </svg>
-            <span>1,200+ founders raising with Advibe</span>
-          </div>
-        </footer>
-      </div>
-
-      {/* Interactive Modal System */}
+      {/* Legacy Intake / Outreach review modal system */}
       <Modals
         activeModal={activeModal}
-        closeModal={closeModal}
-        openModal={openModal}
-        onIntakeSuccess={(company) => setCurrentCompany(company)}
+        closeModal={() => setActiveModal(null)}
+        openModal={(name) => setActiveModal(name)}
+        onIntakeSuccess={() => {}}
       />
     </div>
   );

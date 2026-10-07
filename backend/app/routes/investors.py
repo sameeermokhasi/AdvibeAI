@@ -1,22 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Any
 from app.models.schemas import InvestorOut
 from app.core.db import get_db_cursor, DatabaseService
 from app.core.logging import logger
+from app.core.auth import get_current_user, AuthenticatedUser
 
 router = APIRouter(prefix="/api/v1/investors", tags=["Investors"])
 
 @router.get("", response_model=List[InvestorOut])
-async def get_all_investors() -> Any:
-    """
-    Retrieve all investors and their decision-makers.
-    Attempts to fetch from the database first, gracefully falls back to CSV data if the DB is unavailable.
-    """
+async def get_all_investors(current_user: AuthenticatedUser = Depends(get_current_user)) -> Any:
     try:
-        investors_list = []
-        with get_db_cursor(commit=False) as cur:
-            # Query all investors and join their people
-            cur.execute("""
+        with get_db_cursor(user_id=current_user.id, commit=False) as cur:
+            cur.execute('''
                 SELECT 
                     i.*,
                     COALESCE(
@@ -37,19 +32,15 @@ async def get_all_investors() -> Any:
                 LEFT JOIN public.people p ON i.id = p.investor_id
                 GROUP BY i.id
                 ORDER BY i.firm_name ASC;
-            """)
+            ''')
             rows = cur.fetchall()
-            investors_list = [dict(r) for r in rows]
-            
-        if not investors_list:
-            # Fallback to CSV if DB is empty
-            investors_list = DatabaseService.load_csv_investors()
-            
-        return investors_list
+            if rows:
+                return [dict(r) for r in rows]
 
+        return DatabaseService.load_csv_investors()
     except Exception as e:
         logger.warning(f"Failed to fetch investors from DB, falling back to CSV: {e}")
         try:
             return DatabaseService.load_csv_investors()
-        except Exception as e2:
+        except Exception:
             raise HTTPException(status_code=500, detail="Failed to load investor database")

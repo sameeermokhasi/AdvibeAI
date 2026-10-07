@@ -2,8 +2,12 @@ import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pathlib import Path
+
+_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_PATH if _ENV_PATH.exists() else ".env", extra="ignore")
 
     PROJECT_NAME: str = "Advibe API"
     VERSION: str = "1.0.0"
@@ -20,9 +24,9 @@ class Settings(BaseSettings):
     SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "super-secret-jwt-token-with-at-least-32-chars-long")
 
     # LLM Provider Configuration
-    # Groq (Primary): Ultra low-latency inference on open weights (Llama 3.3 70B), generous tier.
+    # Groq (Primary): Ultra low-latency inference on open weights (Qwen / Llama), generous tier.
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 
     # OpenRouter (Fallback): Multi-provider aggregator (DeepSeek-R1 / Llama), guarantees high availability.
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")

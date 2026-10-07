@@ -18,7 +18,7 @@ from app.core.logging import logger, log_request, request_id_ctx
 from app.core.metrics import metrics
 from app.core.exceptions import ExternalServiceError, AdvibeException
 from app.core.db import check_db_health
-from app.routes import intake, match, outreach, webhook, campaigns, investors
+from app.routes import intake, match, outreach, webhook, campaigns, investors, tracks, addy, twin_finder, resolve, account, auth_routes, memory, watchlist_routes, exclusions, command_center, readiness
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -202,6 +202,17 @@ app.include_router(outreach.router)
 app.include_router(webhook.router)
 app.include_router(campaigns.router)
 app.include_router(investors.router)
+app.include_router(tracks.router)
+app.include_router(addy.router)
+app.include_router(twin_finder.router)
+app.include_router(resolve.router)
+app.include_router(account.router)
+app.include_router(auth_routes.router)
+app.include_router(memory.router)
+app.include_router(watchlist_routes.router)
+app.include_router(exclusions.router)
+app.include_router(command_center.router)
+app.include_router(readiness.router)
 
 
 # ============================================================================

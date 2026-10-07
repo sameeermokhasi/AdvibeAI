@@ -12,7 +12,7 @@ Architecture Rationale:
 import time
 import logging
 from typing import List, Dict, Any, Optional
-from openai import OpenAI, APIError, RateLimitError, APIConnectionError, Timeout
+from openai import OpenAI, APIError, RateLimitError, APIConnectionError, APITimeoutError
 from app.core.config import settings
 
 logger = logging.getLogger("advibe.llm_client")
@@ -49,7 +49,7 @@ def get_model_for_provider(provider: str) -> str:
         return settings.GROQ_MODEL
     elif provider.lower() == "openrouter":
         return settings.OPENROUTER_MODEL
-    return "llama-3.3-70b-versatile"
+    return "qwen/qwen3.8-27b"
 
 
 def chat_completion_with_fallback(
@@ -110,7 +110,7 @@ def chat_completion_with_fallback(
                     return content.strip()
                 raise APIError("Empty response returned from provider choices.", request=None, body=None)
 
-            except (RateLimitError, APIConnectionError, Timeout) as retryable_err:
+            except (RateLimitError, APIConnectionError, APITimeoutError) as retryable_err:
                 last_exception = retryable_err
                 if attempt < max_attempts:
                     backoff_delay = 0.5 * (2 ** (attempt - 1))  # 500ms, 1000ms
