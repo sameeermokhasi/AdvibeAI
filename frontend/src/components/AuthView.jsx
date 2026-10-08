@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Check, Lock, Mail, User } from 'lucide-react';
 import { authSignup, authLogin } from '../lib/api';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export default function AuthView({ initialMode = 'login', onAuthSuccess, onCancel }) {
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
@@ -15,11 +16,29 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [oauthProvider, setOauthProvider] = useState(null); // null | 'google' | 'linkedin'
-  const [oauthEmail, setOauthEmail] = useState('sameermokhasi022@gmail.com');
-  const [oauthName, setOauthName] = useState('Sameer Mokhasi');
+  const [oauthEmail, setOauthEmail] = useState('founder@advibe.ai');
+  const [oauthName, setOauthName] = useState('Advibe Founder');
 
-  const triggerOauth = (provider) => {
-    setOauthProvider(provider);
+  const triggerOauth = async (provider) => {
+    setErrorMsg('');
+    if (isSupabaseConfigured()) {
+      try {
+        setLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: provider === 'linkedin' ? 'linkedin_oidc' : 'google',
+          options: {
+            redirectTo: `${window.location.origin}/dashboard`
+          }
+        });
+        if (error) throw error;
+      } catch (err) {
+        setErrorMsg(err.message || `Failed to authenticate with ${provider}`);
+        setLoading(false);
+      }
+    } else {
+      // Local development fallback modal
+      setOauthProvider(provider);
+    }
   };
 
   const completeOauth = () => {
@@ -180,13 +199,7 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
               {/* LinkedIn Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => {
-                    setLoading(false);
-                    if (onAuthSuccess) onAuthSuccess({ email: 'sameermokhasi022@gmail.com', fullName: 'Sameer Mokhasi' });
-                  }, 600);
-                }}
+                onClick={() => triggerOauth('linkedin')}
                 style={{
                   width: '100%',
                   height: '44px',
@@ -213,13 +226,7 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
               {/* Google Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => {
-                    setLoading(false);
-                    if (onAuthSuccess) onAuthSuccess({ email: 'sameermokhasi022@gmail.com', fullName: 'Sameer Mokhasi' });
-                  }, 600);
-                }}
+                onClick={() => triggerOauth('google')}
                 style={{
                   width: '100%',
                   height: '44px',
@@ -540,13 +547,7 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => {
-                    setLoading(false);
-                    if (onAuthSuccess) onAuthSuccess({ email: 'sameermokhasi022@gmail.com', fullName: 'Sameer Mokhasi' });
-                  }, 600);
-                }}
+                onClick={() => triggerOauth('linkedin')}
                 style={{
                   width: '100%',
                   height: '44px',
@@ -571,13 +572,7 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
 
               <button
                 type="button"
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => {
-                    setLoading(false);
-                    if (onAuthSuccess) onAuthSuccess({ email: 'sameermokhasi022@gmail.com', fullName: 'Sameer Mokhasi' });
-                  }, 600);
-                }}
+                onClick={() => triggerOauth('google')}
                 style={{
                   width: '100%',
                   height: '44px',

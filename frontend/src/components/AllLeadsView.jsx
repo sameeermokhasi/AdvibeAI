@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Bookmark, Trash2, Mail, ExternalLink, RefreshCw, AlertCircle, User, Zap, Lock, Unlock, CheckCircle2 } from 'lucide-react';
-import { getWatchlist, removeFromWatchlist, unlockInvestorEmail } from '../lib/api';
+import { Users, Mail, ExternalLink, RefreshCw, AlertCircle, Zap, Lock, Bookmark, CheckCircle2 } from 'lucide-react';
+import { getWatchlist, unlockInvestorEmail } from '../lib/api';
 
-export default function WatchlistView({ openPricingModal, refreshUserAccount }) {
-  const [items, setItems] = useState([]);
+export default function AllLeadsView({ openPricingModal, refreshUserAccount }) {
+  const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [unlockingId, setUnlockingId] = useState(null);
   const [pendingUnlockPerson, setPendingUnlockPerson] = useState(null);
+  const [unlockingId, setUnlockingId] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
   const showToast = (msg) => {
@@ -15,32 +15,22 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  const loadWatchlist = async () => {
+  const loadLeads = async () => {
     setLoading(true);
     setError('');
     try {
       const data = await getWatchlist();
-      setItems(data || []);
+      setLeads(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to load watchlist');
+      setError(err.message || 'Failed to load leads');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadWatchlist();
+    loadLeads();
   }, []);
-
-  const handleRemove = async (id) => {
-    try {
-      await removeFromWatchlist(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      showToast('Lead removed from Saved Leads.');
-    } catch (err) {
-      setError(err.message || 'Failed to remove item');
-    }
-  };
 
   const handleConfirmUnlock = async () => {
     if (!pendingUnlockPerson) return;
@@ -52,7 +42,7 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
       const res = await unlockInvestorEmail(person.person_id);
       if (res.success) {
         showToast(`Email revealed: ${res.revealed_email}`);
-        setItems((prev) =>
+        setLeads((prev) =>
           prev.map((i) =>
             i.person_id === person.person_id
               ? { ...i, partner_email: res.revealed_email, is_unlocked: true }
@@ -99,7 +89,7 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
         </div>
       )}
 
-      {/* Unlock Confirmation Modal */}
+      {/* Confirmation Dialog */}
       {pendingUnlockPerson && (
         <div style={{
           position: 'fixed',
@@ -131,7 +121,7 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
               </div>
             </div>
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '18px' }}>
-              Unlock the verified work email for <strong>{pendingUnlockPerson.partner_name}</strong> at <strong>{pendingUnlockPerson.firm_name}</strong>. Once unlocked, this contact's email is revealed permanently across your workspace.
+              Reveal the verified work email for <strong>{pendingUnlockPerson.partner_name}</strong> at <strong>{pendingUnlockPerson.firm_name}</strong>.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
@@ -175,21 +165,20 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
         padding: '24px',
         backdropFilter: 'blur(16px)'
       }}>
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Bookmark size={18} style={{ color: '#e2b774' }} />
+              <Users size={18} style={{ color: '#4ade80' }} />
               <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>
-                Saved Leads
+                All Leads
               </h2>
             </div>
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginTop: '4px', lineHeight: '1.5' }}>
-              Your saved decision makers, partners, and allocators stored across sessions.
+              Decision makers you have saved or unlocked from your workspace.
             </p>
           </div>
           <button
-            onClick={loadWatchlist}
+            onClick={loadLeads}
             disabled={loading}
             style={{
               padding: '6px 12px',
@@ -227,12 +216,11 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
           </div>
         )}
 
-        {/* List of Saved Leads */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
-            Loading saved leads...
+            Loading your leads...
           </div>
-        ) : items.length === 0 ? (
+        ) : leads.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: '50px 20px',
@@ -240,15 +228,15 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
             borderRadius: '8px',
             border: '1px dashed rgba(255,255,255,0.08)'
           }}>
-            <Bookmark size={28} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>No Saved Leads Yet</h4>
+            <Users size={28} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
+            <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>No Saved or Unlocked Leads</h4>
             <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-              Bookmark investors from Discover or Lookalikes to pin them here.
+              Save investors from Discover, Lookalikes, or Resolve to view them here.
             </p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {items.map((item) => {
+            {leads.map((item) => {
               const isRevealed = item.is_unlocked || (item.partner_email && !item.partner_email.includes('***'));
 
               return (
@@ -266,7 +254,6 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
                     flexWrap: 'wrap'
                   }}
                 >
-                  {/* Primary Info: Investor Name */}
                   <div style={{ flex: 1, minWidth: '240px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', margin: 0 }}>
@@ -284,41 +271,14 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
                         </a>
                       )}
                     </div>
-
-                    {/* Secondary: Title, Firm, Focus */}
                     <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', marginTop: '4px' }}>
                       <span>{item.role_title || 'General Partner'}</span>
                       {item.firm_name && (
                         <span> · <strong style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>{item.firm_name}</strong></span>
                       )}
-                      {item.geography_focus && item.geography_focus.length > 0 && (
-                        <span> · {item.geography_focus.join(', ')}</span>
-                      )}
                     </div>
-
-                    {/* Focus areas */}
-                    {item.sector_focus && item.sector_focus.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                        {item.sector_focus.slice(0, 3).map((sec, idx) => (
-                          <span
-                            key={idx}
-                            style={{
-                              fontSize: '10px',
-                              background: 'rgba(255,255,255,0.04)',
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              color: 'rgba(255,255,255,0.7)'
-                            }}
-                          >
-                            {sec}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Email & Unlock State */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{
@@ -365,20 +325,6 @@ export default function WatchlistView({ openPricingModal, refreshUserAccount }) 
                         Unlocked
                       </span>
                     )}
-
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'rgba(255,255,255,0.35)',
-                        cursor: 'pointer',
-                        padding: '6px'
-                      }}
-                      title="Remove lead"
-                    >
-                      <Trash2 size={15} />
-                    </button>
                   </div>
                 </div>
               );

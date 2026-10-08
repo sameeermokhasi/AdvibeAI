@@ -41,62 +41,39 @@ export default function ResolveView({ initialFirmsText }) {
     setUploadFile(file);
     setLoading(true);
     try {
-      // 1. First try native backend upload
       const formData = new FormData();
       formData.append('file', file);
-      try {
-        const res = await resolveUploadedFile(formData);
-        if (res && res.results) {
-          setBatchResult(res);
-          return;
-        }
-      } catch (backendErr) {
-        console.warn('Backend file upload fallback triggered:', backendErr);
-      }
-
-      // 2. Client-side CSV Text Reader Fallback
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      
-      // Filter out header line if present
-      const firmNames = lines.map(l => l.split(',')[0].replace(/['"]/g, '').trim()).filter(f => f.toLowerCase() !== 'firm' && f.toLowerCase() !== 'company' && f.length > 1);
-
-      if (firmNames.length > 0) {
-        const res = await resolvePastedFirms(firmNames.join('\n'));
-        setBatchResult(res);
-      } else {
-        alert('Could not detect firm names in the uploaded CSV. Please ensure firm names are in the first column.');
-      }
+      const res = await resolveUploadedFile(formData);
+      setBatchResult(res);
     } catch (err) {
       console.error('File parsing error:', err);
-      alert('Error parsing uploaded file: ' + (err.message || 'Invalid format'));
+      alert('Error enriching uploaded file: ' + (err.message || 'Invalid format'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownloadCsv = () => {
-    if (!batchResult || !batchResult.results) return;
-    
-    // Generate CSV string
-    const headers = ['Firm Name', 'Partner Name', 'Role Title', 'Verified Email', 'Status', 'AUM Display'];
-    const rows = batchResult.results.map(r => [
-      `"${r.firm_name || ''}"`,
-      `"${r.partner_name || ''}"`,
-      `"${r.role_title || ''}"`,
-      `"${r.verified_email || ''}"`,
-      '"Verified"',
-      `"${r.aum_display || ''}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `advibe_enriched_leads_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadCsv = async () => {
+    if (!batchResult || !batchResult.batch_id) return;
+    try {
+      const url = await getResolveExportUrl(batchResult.batch_id);
+      const token = localStorage.getItem('advibe_token');
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error('Export request failed');
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `advibe_resolve_${batchResult.batch_id.slice(0, 8)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      alert('Download CSV failed: ' + err.message);
+    }
   };
 
   return (
@@ -292,10 +269,11 @@ export default function ResolveView({ initialFirmsText }) {
           </div>
 
           {/* Table */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 80px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr 90px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)' }}>
             <span>Firm</span>
             <span>Partner</span>
             <span>Verified Email</span>
+            <span>LinkedIn Profile</span>
             <span style={{ textAlign: 'right' }}>Status</span>
           </div>
 
@@ -305,7 +283,7 @@ export default function ResolveView({ initialFirmsText }) {
                 key={idx}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.2fr 1fr 1.2fr 80px',
+                  gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr 90px',
                   alignItems: 'center',
                   padding: '14px 20px',
                   borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -315,7 +293,7 @@ export default function ResolveView({ initialFirmsText }) {
                 <div>
                   <div style={{ color: '#ffffff', fontWeight: 500 }}>{item.firm_name}</div>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
-                    {item.aum_display} · {(item.stage_focus || []).join(', ')}
+                    {item.aum_display} · {item.match_confidence || 'Catalog'}
                   </div>
                 </div>
 
@@ -328,8 +306,26 @@ export default function ResolveView({ initialFirmsText }) {
                   {item.verified_email}
                 </div>
 
-                <div style={{ textAlign: 'right', color: '#4ade80', fontSize: '12px' }}>
-                  ✓ Verified
+                <div>
+                  {item.linkedin_url && item.linkedin_url !== 'not found' ? (
+                    <a
+                      href={item.linkedin_url.startsWith('http') ? item.linkedin_url : `https://${item.linkedin_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#38bdf8', fontSize: '12px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <span>Profile</span>
+                      <span>↗</span>
+                    </a>
+                  ) : (
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11.5px' }}>
+                      not found
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ textAlign: 'right', fontSize: '12px', color: item.status === 'Verified' ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>
+                  {item.status === 'Verified' ? '✓ Verified' : item.status || 'Resolved'}
                 </div>
               </div>
             ))}

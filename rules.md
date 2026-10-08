@@ -17,8 +17,26 @@ This document establishes the architectural principles, security constraints, co
 > [!CAUTION]
 > **Strict Founder Tenant Isolation**: Founder pitch decks, theses, fit scores, and conversation drafts are proprietary intellectual property.
 - All database queries from the API must execute under authenticated Supabase user context (`auth.uid()`).
-- RLS policies must be explicitly tested for every table (`companies`, `fit_scores`, `outreach_messages`, `campaigns`).
+- RLS policies must be explicitly tested for every table (`companies`, `fit_scores`, `outreach_messages`, `campaigns`, `investor_unlocks`, `credit_ledger`).
 - Service role keys (`SUPABASE_SERVICE_ROLE_KEY`) are restricted exclusively to background workers, system webhooks, and seed scripts.
+
+### 1.3 Email Masking & Single-Reveal Invariant (Non-Negotiable)
+> [!IMPORTANT]
+> **Zero Unmasked Email Leakage**: No endpoint shall ever expose a raw decision-maker email prior to explicit unlock.
+- Emails across all catalog discovery tracks, dossiers, twin finder lookalikes, resolve lists, ADDY chat delivery, and CSV exports are strictly masked by default (`j***@firm.com`).
+- Email reveal costs exactly 1 Spark, executed through the atomic PostgreSQL function `perform_email_unlock(p_user_id, p_person_id, p_revealed_email, p_idempotency_key)`.
+- Row-locking (`FOR UPDATE`) on `user_subscriptions` prevents race conditions.
+- Re-visiting unlocked contacts is strictly idempotent and costs 0 Sparks (never charges twice).
+- LinkedIn profile lookups remain free and never consume Sparks.
+
+### 1.4 HeyReach Integration Rules
+- **Live Validation**: All user-submitted HeyReach API keys must be validated live against `https://api.heyreach.io/api/public/auth/CheckApiKey`.
+- **Encryption at Rest**: API keys are encrypted at rest using Fernet symmetric encryption before storing in `user_integrations`.
+- **Connected Redirect**: Connected outreach views provide a direct launch link to `https://app.heyreach.io` while maintaining local human-in-the-loop review.
+
+### 1.5 Immutable Credit Ledger Integrity
+- **Append-Only Accounting**: `credit_ledger` is protected by a PostgreSQL trigger (`trg_prevent_credit_ledger_mutation`) that blocks all `UPDATE` and `DELETE` operations.
+- **Audit Equality**: The sum of all ledger entries (`SUM(delta)`) for a user must strictly equal `user_subscriptions.sparks_balance`.
 
 ---
 

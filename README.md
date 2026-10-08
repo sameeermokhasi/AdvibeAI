@@ -17,8 +17,8 @@
   - [5. Twin Finder (Lookalike Engine)](#5-twin-finder-lookalike-engine)
   - [6. Resolve (List Enrichment Engine)](#6-resolve-list-enrichment-engine)
   - [7. Scheduled Autopilot & Campaign CRM](#7-scheduled-autopilot--campaign-crm)
-  - [8. Memory & Thesis Knowledge Base](#8-memory--thesis-knowledge-base)
-  - [9. Settings & API Integrations (Claude MCP, ChatGPT, Perplexity)](#9-settings--api-integrations-claude-mcp-chatgpt-perplexity)
+  - [8. Email Unlocks & Single-Reveal Invariant](#8-email-unlocks--single-reveal-invariant)
+  - [9. Settings & API Integrations (Claude MCP, ChatGPT, Perplexity, HeyReach)](#9-settings--api-integrations-claude-mcp-chatgpt-perplexity-heyreach)
 - [AI Engine & Quantitative Fit Scoring Formula](#-ai-engine--quantitative-fit-scoring-formula)
 - [Technology Stack](#-technology-stack)
 - [Repository Structure](#-repository-structure)
@@ -160,12 +160,14 @@ flowchart TD
   - `COLD · PASS / TIMING`
   - `WRONG PERSON · REFERRED`
 
-### 8. Memory & Thesis Knowledge Base
-- **Living Context Memory**: Remembers past deck versions, key objection logs, non-target geographies, and preferred check sizes so subsequent searches become progressively sharper.
+### 8. Email Unlocks & Single-Reveal Invariant
+- **Strict Email Masking**: Emails across all discovery tracks, dossiers, twin finder results, resolve tables, and exports are masked by default (`j***@firm.com`). Full emails are never exposed over the wire until explicitly unlocked.
+- **Atomic 1-Spark Reveal**: Revealing a decision-maker's verified email costs 1 Spark, processed atomically via `perform_email_unlock()` with PostgreSQL row-locking. Re-visiting unlocked contacts is free and never charged twice.
 
 ### 9. Settings & API Integrations
 - **Profile & Workspace**: Manage workspace name, team seats, and organization info.
 - **Integrations**:
+  - **HeyReach Integration**: Direct LinkedIn sequence synchronization validated live against HeyReach API and encrypted at rest with AES/Fernet encryption.
   - **Claude MCP Server**: Connect Claude Desktop and Claude Code via Model Context Protocol to query your investor pipeline directly from Claude.
   - **ChatGPT Action**: Custom GPT action manifest for querying contacts from OpenAI ChatGPT.
   - **Perplexity Connector**: REST endpoint connector for live web search queries.
@@ -442,10 +444,13 @@ WEBHOOK_SIGNING_SECRET="whsec_your_hmac_secret_here"
 - `GET /api/v1/readiness/{company_id}`: **Raise Readiness Radar** analyzing deck completeness, traction evidence, market clarity, financial ask, and moat defensibility.
 - `GET /api/v1/command-center`: **Fundraising Command Center** with real-time target progress, stage conversion funnel, and timeline.
 - `POST /api/v1/command-center/commitment`: Record manual commitments and soft circles from partner meetings.
-- `GET /api/v1/memory`: **ADDY Targeting Memory** showing positive/negative targeting biases and investor feedback.
-- `POST /api/v1/memory`: Add custom targeting preferences and sector conviction rules.
+- `POST /api/v1/unlock`: Atomic 1-Spark decision-maker email unlock with row-locking and idempotency.
+- `POST /api/v1/sparks/top-up`: Add Sparks on-demand with append-only credit ledger audit tracking.
+- `GET /api/v1/campaigns/heyreach/status`: Query HeyReach LinkedIn sequence synchronization status.
+- `POST /api/v1/campaigns/heyreach/connect`: Server-side API key validation and Fernet-encrypted credential storage.
+- `POST /api/v1/campaigns/heyreach/disconnect`: Disconnect HeyReach integration.
 - `GET /api/v1/watchlist`: Saved leads and bookmarked investor decision-makers across sessions.
-- `POST /api/v1/watchlist`: Save partner or firm profile to persistent CRM watchlist.
+- `POST /api/v1/watchlist`: Save partner profile to persistent CRM watchlist.
 - `GET /api/v1/exclusions`: Suppression and skip list for competitive funds and opt-out domains.
 
 ### Outreach & CRM

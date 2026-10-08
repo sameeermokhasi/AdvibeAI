@@ -13,12 +13,24 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.logging import logger, log_request, request_id_ctx
 from app.core.metrics import metrics
 from app.core.exceptions import ExternalServiceError, AdvibeException
 from app.core.db import check_db_health
-from app.routes import intake, match, outreach, webhook, campaigns, investors, tracks, addy, twin_finder, resolve, account, auth_routes, memory, watchlist_routes, exclusions, command_center, readiness
+from app.services.scheduled_worker import start_scheduled_worker, stop_scheduled_worker
+from app.routes import (
+    intake, match, outreach, webhook, campaigns, investors, tracks,
+    addy, twin_finder, resolve, account, auth_routes, watchlist_routes,
+    exclusions, command_center, readiness, scheduled_jobs, billing
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduled_worker()
+    yield
+    stop_scheduled_worker()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -26,8 +38,10 @@ app = FastAPI(
     description="Advibe — AI Investor Discovery & Relationship Operating System API",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    lifespan=lifespan
 )
+
 
 # Explicit CORS Origins Configuration for React Vite & Production
 CORS_ORIGINS = [
@@ -208,11 +222,13 @@ app.include_router(twin_finder.router)
 app.include_router(resolve.router)
 app.include_router(account.router)
 app.include_router(auth_routes.router)
-app.include_router(memory.router)
 app.include_router(watchlist_routes.router)
 app.include_router(exclusions.router)
 app.include_router(command_center.router)
 app.include_router(readiness.router)
+app.include_router(scheduled_jobs.router)
+app.include_router(billing.router)
+
 
 
 # ============================================================================

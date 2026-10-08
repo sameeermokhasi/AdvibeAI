@@ -19,7 +19,7 @@ import {
   ChevronRight,
   RotateCcw
 } from 'lucide-react';
-import { sendAddyMessage, confirmAddySearch } from '../lib/api';
+import { sendAddyMessage, confirmAddySearch, getAddyChatHistory } from '../lib/api';
 
 export default function AddyChat({ onOpenDossier, onOpenOutreach, refreshUserAccount }) {
   // 'overview' matches the user's 4-card screenshot; 'chat' is the active agent conversation
@@ -46,6 +46,26 @@ export default function AddyChat({ onOpenDossier, onOpenOutreach, refreshUserAcc
   const [deliveredLeads, setDeliveredLeads] = useState([]);
   const [isConfirming, setIsConfirming] = useState(false);
   const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const hist = await getAddyChatHistory();
+        if (hist && Array.isArray(hist) && hist.length > 0) {
+          const formatted = hist.map((item) => ({
+            role: item.role,
+            text: item.content,
+            timestamp: item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Earlier'
+          }));
+          setMessages(formatted);
+          setViewMode('chat');
+        }
+      } catch (err) {
+        // Silently preserve greeting
+      }
+    };
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     if (viewMode === 'chat') {
@@ -202,8 +222,8 @@ export default function AddyChat({ onOpenDossier, onOpenOutreach, refreshUserAcc
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', width: '100%', padding: '8px 4px 40px' }}>
       
-      {/* Top Header & Mode Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      {/* Top Header */}
+      <div style={{ marginBottom: '24px' }}>
         <div>
           <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#e2b774', fontWeight: 600, marginBottom: '6px' }}>
             MEET YOUR AGENT
@@ -214,54 +234,6 @@ export default function AddyChat({ onOpenDossier, onOpenOutreach, refreshUserAcc
           <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.55)', marginTop: '8px', lineHeight: 1.45 }}>
             Four things it does for you. Hover a card to watch it work, tap any example to try it.
           </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setViewMode('overview')}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: '1px solid',
-              borderColor: viewMode === 'overview' ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
-              background: viewMode === 'overview' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.4)',
-              color: viewMode === 'overview' ? '#ffffff' : 'rgba(255,255,255,0.5)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <span>Overview</span>
-          </button>
-
-          <button
-            onClick={() => setViewMode('chat')}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: '1px solid',
-              borderColor: viewMode === 'chat' ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
-              background: viewMode === 'chat' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.4)',
-              color: viewMode === 'chat' ? '#ffffff' : 'rgba(255,255,255,0.5)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <MessageSquare size={13} />
-            <span>Agent Chat</span>
-            {messages.length > 1 && (
-              <span style={{ fontSize: '10px', background: '#e2b774', color: '#000000', borderRadius: '10px', padding: '1px 5px', fontWeight: 700 }}>
-                {messages.length}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 

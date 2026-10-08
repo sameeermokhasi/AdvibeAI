@@ -47,6 +47,11 @@ async function request(endpoint, options = {}) {
 
     if (!response.ok) {
       const errorMsg = data?.detail || data?.message || `Request failed with status ${response.status}`;
+      if (response.status === 403 && (data?.detail === 'phone_unverified' || errorMsg.includes('phone_unverified'))) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('phone_unverified'));
+        }
+      }
       throw new ApiError(errorMsg, response.status, data);
     }
 
@@ -189,8 +194,8 @@ export async function confirmAddySearch(payload) {
   });
 }
 
-export async function getAddyMemory() {
-  return request('/api/v1/addy/memory', { method: 'GET' });
+export async function getAddyChatHistory() {
+  return request('/api/v1/addy/history', { method: 'GET' });
 }
 
 // 3. Twin Finder (Lookalike Investor Discovery)
@@ -207,6 +212,14 @@ export async function getTwinFinderFirms(brief, track = 'venture') {
     body: JSON.stringify({ brief, track })
   });
 }
+
+export async function getTwinFinderByInvestor(name, track = 'venture') {
+  return request('/api/v1/twin-finder/by-investor', {
+    method: 'POST',
+    body: JSON.stringify({ name, track })
+  });
+}
+
 
 // 4. Resolve (Bulk Enrichment)
 export async function resolvePastedFirms(firmNames, track = 'venture') {
@@ -294,23 +307,62 @@ export async function getAuthMe() {
   return request('/api/v1/auth/me', { method: 'GET' });
 }
 
-// 8. Memory & Learnings API
-export async function getMemoryItems() {
-  return request('/api/v1/memory', { method: 'GET' });
+// 8. Email Unlock & Sparks API
+export async function unlockInvestorEmail(personId, idempotencyKey = null) {
+  return request('/api/v1/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ person_id: personId, idempotency_key: idempotencyKey })
+  });
 }
 
-export async function addMemoryItem(data) {
-  return request('/api/v1/memory', {
+export async function topUpSparks(amount, packId = null) {
+  return request('/api/v1/sparks/top-up', {
+    method: 'POST',
+    body: JSON.stringify({ amount: parseFloat(amount), pack_id: packId })
+  });
+}
+
+// 9. HeyReach Integration API
+export async function getHeyReachStatus() {
+  return request('/api/v1/campaigns/heyreach/status', { method: 'GET' });
+}
+
+export async function connectHeyReach(apiKey) {
+  return request('/api/v1/campaigns/heyreach/connect', {
+    method: 'POST',
+    body: JSON.stringify({ api_key: apiKey })
+  });
+}
+
+export async function disconnectHeyReach() {
+  return request('/api/v1/campaigns/heyreach/disconnect', { method: 'POST' });
+}
+
+// 10. Scheduled Autopilot Jobs API
+export async function getScheduledJobs() {
+  return request('/api/v1/scheduled-jobs', { method: 'GET' });
+}
+
+export async function createScheduledJob(data) {
+  return request('/api/v1/scheduled-jobs', {
     method: 'POST',
     body: JSON.stringify(data)
   });
 }
 
-export async function deleteMemoryItem(itemId) {
-  return request(`/api/v1/memory/${itemId}`, { method: 'DELETE' });
+export async function pauseScheduledJob(jobId) {
+  return request(`/api/v1/scheduled-jobs/${jobId}/pause`, { method: 'POST' });
 }
 
-// 9. Watchlist (Saved Leads & Firms) API
+export async function resumeScheduledJob(jobId) {
+  return request(`/api/v1/scheduled-jobs/${jobId}/resume`, { method: 'POST' });
+}
+
+export async function cancelScheduledJob(jobId) {
+  return request(`/api/v1/scheduled-jobs/${jobId}/cancel`, { method: 'POST' });
+}
+
+// 11. Watchlist (Saved Leads - People Only) API
 export async function getWatchlist() {
   return request('/api/v1/watchlist', { method: 'GET' });
 }
@@ -326,7 +378,7 @@ export async function removeFromWatchlist(itemId) {
   return request(`/api/v1/watchlist/${itemId}`, { method: 'DELETE' });
 }
 
-// 10. Exclusions API
+// 12. Exclusions API
 export async function getExclusions() {
   return request('/api/v1/exclusions', { method: 'GET' });
 }
@@ -342,7 +394,7 @@ export async function removeExclusion(itemId) {
   return request(`/api/v1/exclusions/${itemId}`, { method: 'DELETE' });
 }
 
-// 11. Command Center & Commitments API
+// 13. Command Center & Commitments API
 export async function getCommandCenter() {
   return request('/api/v1/command-center', { method: 'GET' });
 }
@@ -354,8 +406,72 @@ export async function recordCommitment(data) {
   });
 }
 
-// 12. Raise Readiness Radar API
-export async function getRaiseReadiness(companyId) {
-  return request(`/api/v1/readiness/${companyId}`, { method: 'GET' });
+// 14. Raise Readiness Radar API
+export async function getRaiseReadiness(companyId = null) {
+  const path = companyId && companyId !== 'null' && companyId !== 'undefined'
+    ? `/api/v1/readiness/${companyId}`
+    : '/api/v1/readiness';
+  return request(path, { method: 'GET' });
 }
+
+export async function evaluateRaiseReadiness(companyId = null, workspaceId = null) {
+  return request('/api/v1/readiness/evaluate', {
+    method: 'POST',
+    body: JSON.stringify({ company_id: companyId, workspace_id: workspaceId })
+  });
+}
+
+// 15. Razorpay Payments & Billing API
+export async function createRazorpayOrder(itemType, itemId, billingInterval = 'monthly') {
+  return request('/api/v1/billing/order', {
+    method: 'POST',
+    body: JSON.stringify({ item_type: itemType, item_id: itemId, billing_interval: billingInterval })
+  });
+}
+
+export async function verifyRazorpayPayment(orderId, paymentId, signature) {
+  return request('/api/v1/billing/verify', {
+    method: 'POST',
+    body: JSON.stringify({ order_id: orderId, payment_id: paymentId, signature: signature })
+  });
+}
+export async function getBillingHistory() {
+  return request('/api/v1/billing/history', { method: 'GET' });
+}
+
+// 16. Phone Verification API
+export async function sendPhoneOtp(phone) {
+  return request('/api/v1/auth/phone/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone })
+  });
+}
+
+export async function verifyPhoneOtp(phone, code) {
+  return request('/api/v1/auth/phone/verify', {
+    method: 'POST',
+    body: JSON.stringify({ phone, code })
+  });
+}
+
+// 17. QR Code & Manual Billing API
+export async function createQrPayment(planId) {
+  return request('/api/v1/billing/qr', {
+    method: 'POST',
+    body: JSON.stringify({ plan_id: planId })
+  });
+}
+
+export async function getQrPaymentStatus(qrId) {
+  return request(`/api/v1/billing/qr/${qrId}/status`, { method: 'GET' });
+}
+
+export async function submitManualPayment(utr, planId) {
+  return request('/api/v1/billing/manual-review', {
+    method: 'POST',
+    body: JSON.stringify({ utr, plan_id: planId })
+  });
+}
+
+
 

@@ -1315,3 +1315,45 @@ footer.stats {
   margin-top: 4px;
 }
 
+/* TopBar Unified Layout & Responsive Breakpoints */
+.topbar-root {
+  transition: all 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  .topbar-root {
+    padding: 0 12px !important;
+  }
+  .topbar-mobile-hamburger {
+    display: inline-flex !important;
+  }
+  .topbar-desktop-nav {
+    display: none !important;
+  }
+  .topbar-offer-text {
+    display: none !important;
+  }
+  .topbar-offer-badge {
+    padding: 0 8px !important;
+  }
+  .topbar-sparks-badge span {
+    font-size: 11px !important;
+  }
+  .sidebar {
+    position: fixed !important;
+    left: -260px;
+    z-index: 100 !important;
+    transition: left 0.25s ease !important;
+  }
+  .sidebar.mobile-open {
+    left: 0 !important;
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 95;
+  }
+}
+

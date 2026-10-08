@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield,
   CreditCard,
@@ -17,10 +17,161 @@ import {
   RefreshCw,
   Sliders,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Smartphone,
+  AlertCircle
 } from 'lucide-react';
+import { getBillingHistory, sendPhoneOtp, verifyPhoneOtp } from '../lib/api';
+import { formatMoney, getActiveCurrency, subscribeCurrency } from '../lib/money';
+
+const PHONE_COUNTRY_OPTIONS = [
+  { code: '+91', country: 'India', flag: '🇮🇳' },
+  { code: '+1', country: 'US / Canada', flag: '🇺🇸' },
+  { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+  { code: '+971', country: 'UAE', flag: '🇦🇪' },
+];
 
 export default function SettingsView({ userAccount, openPricingModal, refreshUserAccount }) {
+  // Billing history state
+  const [billingHistory, setBillingHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [currency, setCurrency] = useState(getActiveCurrency());
+
+  useEffect(() => {
+    return subscribeCurrency((curr) => setCurrency(curr));
+  }, []);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const res = await getBillingHistory();
+        if (res?.history) setBillingHistory(res.history);
+      } catch (e) {
+        // Non-blocking
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  // Phone Verification state in Settings
+  const [phoneCountry, setPhoneCountry] = useState('+91');
+  const [phoneNumberInput, setPhoneNumberInput] = useState('');
+  const [phoneStep, setPhoneStep] = useState(userAccount?.phone_verified_at ? 'view' : 'input');
+  const [phoneOtp, setPhoneOtp] = useState(['', '', '', '', '', '']);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneCooldown, setPhoneCooldown] = useState(0);
+  const otpInputRefs = useRef([]);
+
+  useEffect(() => {
+    let t;
+    if (phoneCooldown > 0) {
+      t = setInterval(() => setPhoneCooldown((p) => (p > 0 ? p - 1 : 0)), 1000);
+    }
+    return () => clearInterval(t);
+  }, [phoneCooldown]);
+
+  const handleSendSettingsOtp = async (e) => {
+    if (e) e.preventDefault();
+    setPhoneError('');
+    const clean = phoneNumberInput.replace(/\D/g, '');
+    if (!clean || clean.length < 7 || clean.length > 15) {
+      setPhoneError('Please enter a valid phone number (7-15 digits).');
+      return;
+    }
+    const full = `${phoneCountry}${clean}`;
+    setPhoneLoading(true);
+    try {
+      await sendPhoneOtp(full);
+      setPhoneStep('otp');
+      setPhoneCooldown(30);
+      setPhoneOtp(['', '', '', '', '', '']);
+      showToast(`Verification code sent via SMS to ${full}`);
+    } catch (err) {
+      setPhoneError(err.message || 'Failed to send SMS code.');
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleVerifySettingsOtp = async (codeStr) => {
+    const code = typeof codeStr === 'string' ? codeStr : phoneOtp.join('');
+    if (code.length !== 6) {
+      setPhoneError('Please enter all 6 digits of the code.');
+      return;
+    }
+    setPhoneLoading(true);
+    setPhoneError('');
+    const full = `${phoneCountry}${phoneNumberInput.replace(/\D/g, '')}`;
+    try {
+      const res = await verifyPhoneOtp(full, code);
+      if (res?.success) {
+        showToast('Phone number verified successfully! Sparks credited.');
+        setPhoneStep('view');
+        if (refreshUserAccount) await refreshUserAccount();
+      }
+    } catch (err) {
+      setPhoneError(err.message || 'Invalid or expired verification code.');
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleOtpDigitChange = (idx, val) => {
+    setPhoneError('');
+    const clean = val.replace(/\D/g, '');
+    if (!clean) {
+      const copy = [...phoneOtp];
+      copy[idx] = '';
+      setPhoneOtp(copy);
+      return;
+    }
+    const char = clean.slice(-1);
+    const copy = [...phoneOtp];
+    copy[idx] = char;
+    setPhoneOtp(copy);
+    if (idx < 5 && char) {
+      otpInputRefs.current[idx + 1]?.focus();
+    }
+    if (copy.every((d) => d !== '')) {
+      handleVerifySettingsOtp(copy.join(''));
+    }
+  };
+
+  const handleSettingsOtpKeyDown = (idx, e) => {
+    if (e.key === 'Backspace' && !phoneOtp[idx] && idx > 0) {
+      otpInputRefs.current[idx - 1]?.focus();
+    }
+  };
+
+  const handleSettingsOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').trim().replace(/\D/g, '');
+    if (pasted.length >= 6) {
+      const digits = pasted.slice(0, 6).split('');
+      setPhoneOtp(digits);
+      otpInputRefs.current[5]?.focus();
+      handleVerifySettingsOtp(pasted.slice(0, 6));
+    } else if (pasted.length > 0) {
+      const copy = [...phoneOtp];
+      for (let i = 0; i < pasted.length && i < 6; i++) {
+        copy[i] = pasted[i];
+      }
+      setPhoneOtp(copy);
+      otpInputRefs.current[Math.min(pasted.length, 5)]?.focus();
+    }
+  };
+
+  useEffect(() => {
+    if (userAccount?.phone_verified_at) {
+      setPhoneStep('view');
+    }
+  }, [userAccount?.phone_verified_at]);
+
   // Password Form state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -168,14 +319,15 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
       }}>
         {[
           { id: 'section-email', label: '01 Email' },
-          { id: 'section-password', label: '02 Password' },
-          { id: 'section-connected', label: '02 Connected' },
-          { id: 'section-billing', label: '03 Subscription' },
-          { id: 'section-team', label: '04 Team Seats' },
-          { id: 'section-integrations', label: '05 Integrations' },
-          { id: 'section-api', label: '06 API Keys' },
-          { id: 'section-preferences', label: '07 Preferences' },
-          { id: 'section-danger', label: '08 Danger Zone' }
+          { id: 'section-phone', label: '02 Phone' },
+          { id: 'section-password', label: '03 Password' },
+          { id: 'section-connected', label: '04 Connected' },
+          { id: 'section-billing', label: '05 Subscription' },
+          { id: 'section-team', label: '06 Team Seats' },
+          { id: 'section-integrations', label: '07 Integrations' },
+          { id: 'section-api', label: '08 API Keys' },
+          { id: 'section-preferences', label: '09 Preferences' },
+          { id: 'section-danger', label: '10 Danger Zone' }
         ].map((item) => (
           <button
             key={item.id}
@@ -252,10 +404,311 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </div>
         </div>
 
-        {/* ---------------- 02 Password. ---------------- */}
+        {/* ---------------- 02 Phone Verification. ---------------- */}
+        <div id="section-phone" style={{ scrollMarginTop: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '16px' }}>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>02</span>
+            <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
+              Phone Verification.
+            </h2>
+          </div>
+
+          {userAccount?.phone_verified_at && phoneStep === 'view' ? (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '18px 24px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              maxWidth: '640px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  background: 'rgba(74, 222, 128, 0.12)',
+                  border: '1px solid rgba(74, 222, 128, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#4ade80'
+                }}>
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '14.5px', fontWeight: 500, color: '#ffffff', letterSpacing: '0.02em' }}>
+                    {userAccount?.phone || (phoneNumberInput ? `${phoneCountry} ${phoneNumberInput}` : '+91 80732 25850')}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4ade80', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>✓ Verified Mobile Number</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
+                    <span style={{ color: '#e2b774' }}>10 Sparks Bonus Unlocked</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoneStep('input');
+                  setPhoneNumberInput('');
+                  setPhoneError('');
+                }}
+                style={{
+                  fontSize: '13px',
+                  color: 'rgba(255, 255, 255, 0.75)',
+                  textDecoration: 'underline',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Change number
+              </button>
+            </div>
+          ) : phoneStep === 'otp' ? (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '24px',
+              maxWidth: '540px'
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                  Enter 6-digit SMS Code
+                </div>
+                <div style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
+                  Sent via SMS to <span style={{ color: '#fff', fontWeight: 500 }}>{phoneCountry} {phoneNumberInput}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }} onPaste={handleSettingsOtpPaste}>
+                {phoneOtp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (otpInputRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleSettingsOtpKeyDown(idx, e)}
+                    style={{
+                      width: '44px',
+                      height: '48px',
+                      textAlign: 'center',
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: digit ? '1px solid #ffffff' : '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      outline: 'none',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                ))}
+              </div>
+
+              {phoneError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#f87171', marginBottom: '16px' }}>
+                  <AlertCircle size={14} />
+                  <span>{phoneError}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleVerifySettingsOtp()}
+                  disabled={phoneLoading || phoneOtp.join('').length !== 6}
+                  style={{
+                    background: '#ffffff',
+                    color: '#000000',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    padding: '10px 22px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: (phoneLoading || phoneOtp.join('').length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (phoneLoading || phoneOtp.join('').length !== 6) ? 0.6 : 1
+                  }}
+                >
+                  {phoneLoading ? 'Verifying...' : 'Verify Code'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSendSettingsOtp}
+                  disabled={phoneCooldown > 0 || phoneLoading}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    color: phoneCooldown > 0 ? 'rgba(255,255,255,0.4)' : '#ffffff',
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    padding: '10px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    cursor: phoneCooldown > 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {phoneCooldown > 0 ? `Resend code in ${phoneCooldown}s` : 'Resend code'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneStep('input');
+                    setPhoneError('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'rgba(255,255,255,0.5)',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    marginLeft: 'auto'
+                  }}
+                >
+                  Edit number
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '24px',
+              maxWidth: '540px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  background: 'rgba(226, 183, 116, 0.12)',
+                  border: '1px solid rgba(226, 183, 116, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#e2b774'
+                }}>
+                  <Smartphone size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '14.5px', fontWeight: 600, color: '#ffffff' }}>
+                    Verify Mobile via SMS
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                    Get instant SMS investor updates & claim 10 complimentary Sparks.
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSendSettingsOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255, 255, 255, 0.45)', marginBottom: '8px' }}>
+                    PHONE NUMBER
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      value={phoneCountry}
+                      onChange={(e) => setPhoneCountry(e.target.value)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '6px',
+                        padding: '11px 10px',
+                        color: '#ffffff',
+                        fontSize: '13px',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {PHONE_COUNTRY_OPTIONS.map((opt) => (
+                        <option key={opt.code} value={opt.code} style={{ background: '#18181b', color: '#fff' }}>
+                          {opt.flag} {opt.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      placeholder="80732 25850"
+                      value={phoneNumberInput}
+                      onChange={(e) => setPhoneNumberInput(e.target.value)}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '6px',
+                        padding: '11px 14px',
+                        color: '#ffffff',
+                        fontSize: '13.5px',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {phoneError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#f87171' }}>
+                    <AlertCircle size={14} />
+                    <span>{phoneError}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    type="submit"
+                    disabled={phoneLoading}
+                    style={{
+                      background: '#ffffff',
+                      color: '#000000',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      padding: '10px 20px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: phoneLoading ? 'not-allowed' : 'pointer',
+                      opacity: phoneLoading ? 0.7 : 1
+                    }}
+                  >
+                    {phoneLoading ? 'Sending SMS...' : 'Send Verification Code'}
+                  </button>
+
+                  {userAccount?.phone_verified_at && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhoneStep('view');
+                        setPhoneError('');
+                      }}
+                      style={{
+                        background: 'transparent',
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: '13px',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* ---------------- 03 Password. ---------------- */}
         <div id="section-password" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>02</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>03</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Password.
             </h2>
@@ -352,10 +805,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </form>
         </div>
 
-        {/* ---------------- 02 Connected accounts. ---------------- */}
+        {/* ---------------- 04 Connected accounts. ---------------- */}
         <div id="section-connected" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>02</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>04</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Connected accounts.
             </h2>
@@ -383,10 +836,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </p>
         </div>
 
-        {/* ---------------- 03 Plan & Billing. ---------------- */}
+        {/* ---------------- 05 Plan & Billing. ---------------- */}
         <div id="section-billing" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>03</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>05</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Subscription &amp; Billing.
             </h2>
@@ -444,13 +897,62 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
                 </div>
               </div>
             </div>
+
+            {/* Invoices & Payment History */}
+            <div style={{ marginTop: '28px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                Billing History &amp; Invoices
+              </h4>
+
+              {billingHistory.length === 0 ? (
+                <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '12.5px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                  {historyLoading ? 'Loading billing records...' : 'No past payments on record. Free trial active.'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {billingHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: '6px',
+                        fontSize: '12.5px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#ffffff', textTransform: 'capitalize' }}>
+                          {item.item_type.replace('_', ' ')} · {item.item_id}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                          Order: {item.order_id} {item.payment_id ? `· Pay: ${item.payment_id}` : ''}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 600, color: '#e2b774' }}>
+                          {formatMoney(item.amount_inr, currency)}
+                        </div>
+                        <div style={{ fontSize: '10px', color: item.status === 'paid' ? '#4ade80' : '#f87171', textTransform: 'uppercase', marginTop: '2px' }}>
+                          ● {item.status}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ---------------- 04 Team Seats. ---------------- */}
+        {/* ---------------- 06 Team Seats. ---------------- */}
         <div id="section-team" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>04</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>06</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Team Seats &amp; Collaboration.
             </h2>
@@ -555,10 +1057,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </div>
         </div>
 
-        {/* ---------------- 05 Integrations & MCP. ---------------- */}
+        {/* ---------------- 07 Integrations & MCP. ---------------- */}
         <div id="section-integrations" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>05</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>07</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Integrations &amp; Export.
             </h2>
@@ -639,10 +1141,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </div>
         </div>
 
-        {/* ---------------- 06 API Keys. ---------------- */}
+        {/* ---------------- 08 API Keys. ---------------- */}
         <div id="section-api" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>06</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>08</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Secret API Keys.
             </h2>
@@ -708,10 +1210,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </div>
         </div>
 
-        {/* ---------------- 07 Preferences & Notifications. ---------------- */}
+        {/* ---------------- 09 Preferences & Notifications. ---------------- */}
         <div id="section-preferences" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>07</span>
+            <span style={{ fontSize: '15px', color: 'rgba(255,255,255,0.3)', marginRight: '10px', fontFamily: 'monospace' }}>09</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#ffffff' }}>
               Preferences &amp; Notifications.
             </h2>
@@ -761,10 +1263,10 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
           </div>
         </div>
 
-        {/* ---------------- 08 Danger Zone. ---------------- */}
+        {/* ---------------- 10 Danger Zone. ---------------- */}
         <div id="section-danger" style={{ scrollMarginTop: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '20px' }}>
-            <span style={{ fontSize: '15px', color: 'rgba(248, 113, 113, 0.5)', marginRight: '10px', fontFamily: 'monospace' }}>08</span>
+            <span style={{ fontSize: '15px', color: 'rgba(248, 113, 113, 0.5)', marginRight: '10px', fontFamily: 'monospace' }}>10</span>
             <h2 className="font-serif" style={{ fontSize: '28px', fontWeight: 400, color: '#f87171' }}>
               Danger Zone.
             </h2>

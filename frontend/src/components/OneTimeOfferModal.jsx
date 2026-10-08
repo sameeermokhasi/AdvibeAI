@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { claimDiscount } from '../lib/api';
+import { formatMoney, getActiveCurrency, subscribeCurrency } from '../lib/money';
 
 export default function OneTimeOfferModal({ isOpen, onClose, onClaimSuccess }) {
   const [claiming, setClaiming] = useState(false);
+  const [currency, setCurrency] = useState(getActiveCurrency());
+
+  useEffect(() => {
+    return subscribeCurrency((newCurr) => setCurrency(newCurr));
+  }, []);
 
   if (!isOpen) return null;
 
@@ -90,24 +96,24 @@ export default function OneTimeOfferModal({ isOpen, onClose, onClaimSuccess }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ color: 'rgba(255,255,255,0.8)' }}>Solo</span>
-              <span><strong style={{ color: '#ffffff', fontSize: '16px' }}>$53</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
+              <span><strong style={{ color: '#ffffff', fontSize: '15px' }}>{formatMoney(4499, currency, { decimals: 0 })}</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ color: 'rgba(255,255,255,0.8)' }}>Starter</span>
-              <span><strong style={{ color: '#ffffff', fontSize: '16px' }}>$161</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
+              <span><strong style={{ color: '#ffffff', fontSize: '15px' }}>{formatMoney(13499, currency, { decimals: 0 })}</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ color: 'rgba(255,255,255,0.8)' }}>Growth</span>
-              <span><strong style={{ color: '#ffffff', fontSize: '16px' }}>$476</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
+              <span><strong style={{ color: '#ffffff', fontSize: '15px' }}>{formatMoney(40499, currency, { decimals: 0 })}</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ color: 'rgba(255,255,255,0.8)' }}>Pro</span>
-              <span><strong style={{ color: '#ffffff', fontSize: '16px' }}>$953</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
+              <span><strong style={{ color: '#ffffff', fontSize: '15px' }}>{formatMoney(80999, currency, { decimals: 0 })}</strong><span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>/mo</span></span>
             </div>
           </div>
         </div>

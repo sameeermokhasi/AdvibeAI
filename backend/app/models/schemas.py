@@ -206,6 +206,7 @@ class WebhookReplyPayload(BaseModel):
     subject: str = Field(..., examples=["Re: FinFlow AI - Seed raise overview"])
     text: str = Field(..., examples=["Thanks for reaching out. We find your thesis very interesting. Are you free for a call this Thursday at 2pm PST?"])
     message_id_header: Optional[str] = Field(None, description="Resend/In-Reply-To Message-ID")
+    provider_event_id: Optional[str] = Field(None, description="Webhook event idempotency key")
 
 class OutcomeOut(BaseModel):
     id: str
@@ -319,20 +320,46 @@ class TwinFinderFirmsResponse(BaseModel):
     firms_count: int
     firms: List[LookalikeFirm]
 
+class InvestorNameSearchRequest(BaseModel):
+    name: str = Field(..., description="Target investor/firm or partner name to find lookalikes for")
+    track: Optional[str] = "venture"
+
+class InvestorTwinMatch(BaseModel):
+    investor_id: str
+    firm_name: str
+    lead_partner: str
+    score: int
+    stage_alignment: str
+    sector_alignment: str
+    geography_alignment: str
+    check_size_display: str
+    why_matched: str
+    is_closest_match: bool = False
+
+class InvestorTwinsResponse(BaseModel):
+    query: str
+    resolved_target: Optional[Dict[str, Any]] = None
+    matches_count: int
+    twins: List[InvestorTwinMatch]
+
 class ResolvePasteRequest(BaseModel):
     firm_names: str = Field(..., examples=["Sequoia Capital\nAndreessen Horowitz\nBessemer Venture Partners\nForerunner Ventures\nLerer Hippeau"])
     track: Optional[RaiseTrack] = RaiseTrack.VENTURE
 
 class ResolvedLead(BaseModel):
+    person_id: Optional[str] = None
     firm_name: str
     partner_name: str
     role_title: str
     verified_email: str
     linkedin_url: str
+    match_confidence: str = "High"
+    status: str = "Verified"
     is_placement_agent: bool = False
     aum_display: str
     stage_focus: List[str] = []
     verified: bool = True
+
 
 class ResolveBatchResponse(BaseModel):
     batch_id: str
@@ -362,6 +389,8 @@ class UserAccountOut(BaseModel):
     discount_claimed: bool = False
     team_seats: int = 1
     workspace_name: str = "General"
+    phone: Optional[str] = None
+    phone_verified_at: Optional[str] = None
 
 class ClaimDiscountRequest(BaseModel):
     plan_tier: str = "solo"
@@ -383,3 +412,65 @@ class PlaybookResourceOut(BaseModel):
     download_url: Optional[str] = None
     items_count: int = 0
     is_claimed: bool = False
+
+# ============================================================================
+# Email Unlock & Sparks Schemas
+# ============================================================================
+
+class EmailUnlockRequest(BaseModel):
+    person_id: str = Field(..., description="UUID of the person/investor to unlock")
+    idempotency_key: Optional[str] = Field(None, description="Client idempotency key to prevent double debit")
+
+class EmailUnlockResponse(BaseModel):
+    success: bool
+    person_id: str
+    revealed_email: str
+    already_unlocked: bool
+    sparks_charged: float
+    remaining_sparks: float
+
+class SparksTopUpRequest(BaseModel):
+    amount: float = Field(..., gt=0, description="Number of sparks to purchase (e.g. 10, 50, 100)")
+    pack_id: Optional[str] = Field(None, description="Pack identifier (starter_10, pro_50, scale_100)")
+
+class SparksTopUpResponse(BaseModel):
+    success: bool
+    sparks_added: float
+    new_balance: float
+    message: str
+
+# ============================================================================
+# HeyReach Integration Schemas
+# ============================================================================
+
+class HeyReachConnectRequest(BaseModel):
+    api_key: str = Field(..., min_length=10, description="HeyReach Workspace API Key")
+
+class HeyReachStatusResponse(BaseModel):
+    connected: bool
+    provider: str = "heyreach"
+    connected_at: Optional[str] = None
+    account_info: Optional[Dict[str, Any]] = None
+    web_app_url: str = "https://app.heyreach.io"
+
+# ============================================================================
+# Scheduled Jobs Schemas
+# ============================================================================
+
+class ScheduledJobCreateRequest(BaseModel):
+    track: str = Field("venture", pattern="^(venture|real_estate|fund_lp)$")
+    cadence: str = Field("weekly_monday", pattern="^(weekly_monday|daily|biweekly)$")
+    batch_size: int = Field(25, ge=5, le=100)
+
+class ScheduledJobOut(BaseModel):
+    id: str
+    track: str
+    cadence: str
+    batch_size: int
+    status: str
+    last_run_at: Optional[str] = None
+    next_run_at: Optional[str] = None
+    run_count: int = 0
+    last_summary: Optional[str] = None
+    created_at: str
+

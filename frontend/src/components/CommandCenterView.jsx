@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, CheckCircle, Clock, Plus, RefreshCw, AlertCircle, DollarSign, Calendar } from 'lucide-react';
 import { getCommandCenter, recordCommitment } from '../lib/api';
+import { formatMoney, convertUSDToINR, subscribeCurrency, getActiveCurrency } from '../lib/money';
 
 export default function CommandCenterView() {
   const [data, setData] = useState(null);
@@ -55,10 +56,19 @@ export default function CommandCenterView() {
     }
   };
 
-  const target = data?.raise_target || 2000000;
-  const committed = data?.total_committed || 0;
-  const soft = data?.soft_circles || 0;
-  const progressPercent = Math.min(100, Math.round(((committed + soft) / (target || 1)) * 100));
+  const [currentCurrency, setCurrentCurrency] = useState(getActiveCurrency());
+
+  useEffect(() => {
+    return subscribeCurrency((curr) => setCurrentCurrency(curr));
+  }, []);
+
+  const targetUSD = data?.raise_target || 2000000;
+  const committedUSD = data?.total_committed || 0;
+  const softUSD = data?.soft_circles || 0;
+  const progressPercent = Math.min(100, Math.round(((committedUSD + softUSD) / (targetUSD || 1)) * 100));
+
+  const totalRaisedINR = convertUSDToINR(committedUSD + softUSD);
+  const targetINR = convertUSDToINR(targetUSD);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '8px 0 40px' }}>
@@ -156,9 +166,9 @@ export default function CommandCenterView() {
                 Round Capital Progress
               </span>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#ffffff', marginTop: '2px' }}>
-                ${((committed + soft) / 1000).toLocaleString()}K{' '}
+                {formatMoney(totalRaisedINR, currentCurrency, { compact: true })}{' '}
                 <span style={{ fontSize: '14px', fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>
-                  / ${(target / 1000).toLocaleString()}K Target
+                  / {formatMoney(targetINR, currentCurrency, { compact: true })} Target
                 </span>
               </div>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Send, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronUp, RefreshCw, Mail, ShieldCheck } from 'lucide-react';
-import { getCampaigns, sendOutreach } from '../lib/api';
+import { Send, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronUp, RefreshCw, Mail, ShieldCheck, ExternalLink, Key, Unlink } from 'lucide-react';
+import { getCampaigns, sendOutreach, getHeyReachStatus, connectHeyReach, disconnectHeyReach } from '../lib/api';
 
 export default function OutreachView({ userAccount, refreshUserAccount }) {
   const [campaigns, setCampaigns] = useState([]);
@@ -10,11 +10,54 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
+  // HeyReach Integration State
+  const [heyreachConnected, setHeyreachConnected] = useState(null); // null = checking
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [connectingHeyreach, setConnectingHeyreach] = useState(false);
+  const [heyreachError, setHeyreachError] = useState('');
+
+  const checkHeyReach = async () => {
+    try {
+      const res = await getHeyReachStatus();
+      setHeyreachConnected(Boolean(res?.connected));
+    } catch (err) {
+      setHeyreachConnected(false);
+    }
+  };
+
+  const handleConnectHeyReach = async (e) => {
+    if (e) e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+    setConnectingHeyreach(true);
+    setHeyreachError('');
+    try {
+      const res = await connectHeyReach(apiKeyInput.trim());
+      if (res.connected) {
+        setHeyreachConnected(true);
+        setApiKeyInput('');
+        loadData();
+      }
+    } catch (err) {
+      setHeyreachError(err.message || 'Invalid HeyReach API Key or connection failed.');
+    } finally {
+      setConnectingHeyreach(false);
+    }
+  };
+
+  const handleDisconnectHeyReach = async () => {
+    if (!window.confirm('Disconnect your HeyReach integration?')) return;
+    try {
+      await disconnectHeyReach();
+      setHeyreachConnected(false);
+    } catch (err) {
+      alert(err.message || 'Failed to disconnect');
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
-      // In development, company ID is user-scoped
       const companyId = userAccount?.id || '00000000-0000-0000-0000-000000000001';
       const data = await getCampaigns(companyId);
       setCampaigns(data || []);
@@ -29,6 +72,7 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
   };
 
   useEffect(() => {
+    checkHeyReach();
     loadData();
   }, []);
 
@@ -74,8 +118,183 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
     }
   };
 
+  if (heyreachConnected === false) {
+    return (
+      <div style={{ maxWidth: '680px', margin: '40px auto', width: '100%', padding: '0 16px' }}>
+        <div style={{
+          background: 'rgba(20,20,20,0.75)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '14px',
+          padding: '36px',
+          backdropFilter: 'blur(20px)',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '12px',
+            background: 'rgba(226, 183, 116, 0.1)',
+            border: '1px solid rgba(226, 183, 116, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px',
+            color: '#e2b774'
+          }}>
+            <Key size={26} />
+          </div>
+
+          <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
+            Connect to HeyReach
+          </h2>
+          <p style={{ fontSize: '13.5px', color: 'rgba(255,255,255,0.65)', lineHeight: '1.5', maxWidth: '480px', margin: '0 auto 24px' }}>
+            Advibe pairs your curated investor targets directly with your LinkedIn outreach sequences. Enter your HeyReach API key to connect your account.
+          </p>
+
+          {heyreachError && (
+            <div style={{
+              padding: '10px 14px',
+              marginBottom: '20px',
+              background: 'rgba(248,113,113,0.1)',
+              border: '1px solid rgba(248,113,113,0.3)',
+              borderRadius: '8px',
+              color: '#f87171',
+              fontSize: '12.5px',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <AlertCircle size={15} />
+              {heyreachError}
+            </div>
+          )}
+
+          <form onSubmit={handleConnectHeyReach} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ textAlign: 'left' }}>
+              <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.5)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                HeyReach API Key
+              </label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="e.g. hr_live_sk_..."
+                style={{
+                  width: '100%',
+                  background: 'rgba(0,0,0,0.5)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  color: '#ffffff',
+                  fontSize: '13.5px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={connectingHeyreach || !apiKeyInput.trim()}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '13px',
+                fontWeight: 600,
+                borderRadius: '8px',
+                background: apiKeyInput.trim() ? '#ffffff' : 'rgba(255,255,255,0.1)',
+                color: apiKeyInput.trim() ? '#000000' : 'rgba(255,255,255,0.4)',
+                cursor: apiKeyInput.trim() && !connectingHeyreach ? 'pointer' : 'default',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              {connectingHeyreach ? 'Verifying with HeyReach API...' : 'Connect HeyReach Account →'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.5' }}>
+            🔒 <strong>Enterprise Invariant:</strong> Key is validated against <code>api.heyreach.io/api/public/auth/CheckApiKey</code> and encrypted at rest with Fernet.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', width: '100%', padding: '8px 0 40px' }}>
+      {/* HeyReach Connected Banner */}
+      <div style={{
+        marginBottom: '20px',
+        background: 'rgba(74, 222, 128, 0.05)',
+        border: '1px solid rgba(74, 222, 128, 0.2)',
+        borderRadius: '10px',
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <CheckCircle2 size={18} style={{ color: '#4ade80' }} />
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
+              HeyReach Connected & Synchronized
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.5)' }}>
+              Outreach sequences active on LinkedIn via encrypted credentials
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <a
+            href="https://app.heyreach.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: '#ffffff',
+              color: '#000000',
+              fontSize: '12px',
+              fontWeight: 600,
+              padding: '7px 14px',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>Launch HeyReach Web App</span>
+            <ExternalLink size={12} />
+          </a>
+
+          <button
+            onClick={handleDisconnectHeyReach}
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '12px',
+              fontWeight: 500,
+              padding: '7px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <Unlink size={12} />
+            <span>Disconnect</span>
+          </button>
+        </div>
+      </div>
+
       <div style={{
         background: 'rgba(20,20,20,0.65)',
         border: '1px solid rgba(255,255,255,0.1)',

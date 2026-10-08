@@ -1,10 +1,14 @@
 import os
 from typing import List
+from pathlib import Path
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pathlib import Path
-
 _ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+if _ENV_PATH.exists():
+    load_dotenv(_ENV_PATH, override=True)
+else:
+    load_dotenv(override=True)
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_PATH if _ENV_PATH.exists() else ".env", extra="ignore")
@@ -49,4 +53,21 @@ class Settings(BaseSettings):
     INTAKE_RATE_LIMIT: str = "10/minute"
     SEND_RATE_LIMIT: str = "30/minute"
 
+    # Integration Encryption (Fernet at rest)
+    HEYREACH_ENCRYPTION_KEY: str = os.getenv("HEYREACH_ENCRYPTION_KEY", "uO7kP9Zq4qM8wY7x3L4bA1s8D9f2G5h6J7k8L9z0X1c=")
+
+    # Razorpay Payment Gateway Configuration
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "rzp_test_advibe_mock_key")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "rzp_secret_advibe_mock_secret")
+    RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "rzp_whsec_advibe_mock")
+
+    # MSG91 SMS Service Configuration
+    MSG91_AUTH_KEY: str = os.getenv("MSG91_AUTH_KEY", "")
+    MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")
+    MSG91_SENDER_ID: str = os.getenv("MSG91_SENDER_ID", "ADVIBE")
+
+    # Manual QR Fallback (Default False)
+    MANUAL_QR_ENABLED: bool = os.getenv("MANUAL_QR_ENABLED", "false").lower() in ("true", "1", "yes")
+
 settings = Settings()
+

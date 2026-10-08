@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Zap, Bookmark, ListFilter, Ban, Sparkles } from 'lucide-react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import WebThreads from './components/WebThreads';
 import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
 import AddyChat from './components/AddyChat';
 import TracksView from './components/TracksView';
 import TwinFinderView from './components/TwinFinderView';
@@ -16,19 +17,28 @@ import OneTimeOfferModal from './components/OneTimeOfferModal';
 import Modals from './components/Modals';
 import LandingPage from './components/LandingPage';
 import AuthView from './components/AuthView';
-import MemoryView from './components/MemoryView';
+import AllLeadsView from './components/AllLeadsView';
+import ScheduledRunsView from './components/ScheduledRunsView';
 import WatchlistView from './components/WatchlistView';
 import ExclusionsView from './components/ExclusionsView';
 import OutreachView from './components/OutreachView';
 import CommandCenterView from './components/CommandCenterView';
 import RaiseReadinessView from './components/RaiseReadinessView';
+import PhoneVerificationView from './components/PhoneVerificationView';
 import { checkHealth, getUserAccount, getLiveStats, getAuthMe } from './lib/api';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
-  const [appMode, setAppMode] = useState('landing'); // 'landing' | 'dashboard'
-  const [authMode, setAuthMode] = useState(null); // null | 'login' | 'signup'
-  const [activeView, setActiveView] = useState('addy'); // 'addy' | 'tracks' | 'twin-finder' | 'resolve' | 'scheduled' | 'memory' | 'all-leads' | 'watchlist' | 'all-searches' | 'exclusions' | 'outreach' | 'playbooks' | 'integrations' | 'faq'
-  
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Authentication & session restoration gate
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+
+  // Mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   // Modals state
   const [pricingOpen, setPricingOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
@@ -68,91 +78,301 @@ export default function App() {
     }, 15000);
     return () => clearTimeout(timer);
   }, []);
-
   // Sync health & account data
   const refreshAccount = async () => {
     try {
       const acc = await getUserAccount();
-      if (acc) setUserAccount(acc);
+      if (acc) {
+        setUserAccount((prev) => ({
+          ...prev,
+          ...acc,
+          sparks_balance: parseFloat(acc.sparks_balance != null ? acc.sparks_balance : prev.sparks_balance),
+          addy_messages_balance: parseInt(acc.addy_messages_balance != null ? acc.addy_messages_balance : prev.addy_messages_balance)
+        }));
+      }
     } catch (e) {
-      // Keep default mock
+      // Keep state intact
     }
   };
 
+  // Boot & session restoration
   useEffect(() => {
+    let isMounted = true;
+
     const init = async () => {
       try {
         const health = await checkHealth();
-        if (health?.status === 'healthy' || health?.database?.status === 'healthy') {
-          setDbStatus('connected');
-        } else {
+        if (isMounted && (health?.status === 'healthy' || health?.database?.status === 'healthy')) {
           setDbStatus('connected');
         }
       } catch (e) {
-        setDbStatus('connected');
+        if (isMounted) setDbStatus('connected');
       }
 
-      refreshAccount();
+      // Check Supabase OAuth session restoration
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            localStorage.setItem('advibe_token', session.access_token);
+            if (session.refresh_token) {
+              localStorage.setItem('advibe_refresh_token', session.refresh_token);
+            }
+            if (session.user) {
+              const u = {
+                id: session.user.id,
+                email: session.user.email,
+                fullName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0],
+                phone: session.user.phone,
+                phone_verified_at: session.user.phone_confirmed_at || null
+              };
+              localStorage.setItem('advibe_user', JSON.stringify(u));
+            }
+          }
+        } catch (e) {
+          // Keep existing flow
+        }
+      }
 
-      // Check saved session
+      // Check saved token / session
       const savedToken = localStorage.getItem('advibe_token');
-      if (savedToken && savedToken !== 'dev-mock-token') {
+      if (savedToken) {
         try {
           const me = await getAuthMe();
-          if (me?.email) {
+          if (isMounted && me?.email) {
             setUserAccount((prev) => ({
               ...prev,
               ...me,
-              sparks_balance: parseFloat(me.sparks_balance || prev.sparks_balance),
-              addy_messages_balance: parseInt(me.addy_messages_balance || prev.addy_messages_balance)
+              sparks_balance: parseFloat(me.sparks_balance != null ? me.sparks_balance : prev.sparks_balance),
+              addy_messages_balance: parseInt(me.addy_messages_balance != null ? me.addy_messages_balance : prev.addy_messages_balance)
             }));
-            setAppMode('dashboard');
+            setIsAuthenticated(true);
           }
         } catch (e) {
-          // Token invalid/expired - clear
-          localStorage.removeItem('advibe_token');
-          localStorage.removeItem('advibe_refresh_token');
-          localStorage.removeItem('advibe_user');
+          // If token was an invalid non-mock token, clear it
+          if (savedToken !== 'dev-mock-token') {
+            localStorage.removeItem('advibe_token');
+            localStorage.removeItem('advibe_refresh_token');
+            localStorage.removeItem('advibe_user');
+          }
         }
       }
 
       try {
         const stats = await getLiveStats();
-        if (stats) setLiveStats(stats);
+        if (isMounted && stats) setLiveStats(stats);
       } catch (e) {}
+
+      if (isMounted) {
+        setIsSessionLoading(false);
+      }
     };
 
     init();
+
+    // Listen to Supabase auth state changes (OAuth redirects like Google / LinkedIn)
+    let authListener = null;
+    if (isSupabaseConfigured()) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!isMounted) return;
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.access_token) {
+          localStorage.setItem('advibe_token', session.access_token);
+          if (session.refresh_token) {
+            localStorage.setItem('advibe_refresh_token', session.refresh_token);
+          }
+          const userMeta = session.user?.user_metadata || {};
+          const u = {
+            id: session.user.id,
+            email: session.user.email,
+            fullName: userMeta.full_name || userMeta.name || session.user.email?.split('@')[0],
+            phone: session.user.phone,
+            phone_verified_at: session.user.phone_confirmed_at || null
+          };
+          localStorage.setItem('advibe_user', JSON.stringify(u));
+          handleAuthSuccess(u);
+        } else if (event === 'SIGNED_OUT') {
+          handleSignOut();
+        }
+      });
+      authListener = data.subscription;
+    }
+
+    return () => {
+      isMounted = false;
+      authListener?.unsubscribe();
+    };
   }, []);
+
+  const handleAuthSuccess = (user) => {
+    const isVerified = Boolean(user?.phone_verified_at);
+    if (user?.email) {
+      setUserAccount((prev) => ({
+        ...prev,
+        id: user.id || prev.id,
+        email: user.email,
+        phone: user.phone || prev.phone,
+        phone_verified_at: user.phone_verified_at || null,
+        plan_tier: user.plan_tier || prev.plan_tier,
+        sparks_balance: parseFloat(user.sparks_balance != null ? user.sparks_balance : prev.sparks_balance),
+        addy_messages_balance: parseInt(user.addy_messages_balance != null ? user.addy_messages_balance : prev.addy_messages_balance),
+        workspace_name: user.workspace_name || (user.fullName ? `${user.fullName}'s Workspace` : prev.workspace_name)
+      }));
+    }
+    setIsAuthenticated(true);
+    refreshAccount();
+    navigate('/dashboard');
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('advibe_token');
+    localStorage.removeItem('advibe_refresh_token');
+    localStorage.removeItem('advibe_user');
+    setIsAuthenticated(false);
+    navigate('/');
+  };
 
   const handleTwinFinderToResolve = (firmsText) => {
     setResolveInitialFirms(firmsText);
-    setActiveView('resolve');
+    navigate('/resolve');
   };
 
-  if (authMode) {
+  // Convert current path to active view ID for Sidebar and TopBar
+  const getActiveViewId = (pathname) => {
+    const map = {
+      '/dashboard': 'command-center',
+      '/command-center': 'command-center',
+      '/agent-chat': 'addy',
+      '/discover': 'discovery',
+      '/twin-finder': 'twin-finder',
+      '/resolve': 'resolve',
+      '/scheduled': 'scheduled',
+      '/readiness': 'readiness',
+      '/campaign': 'outreach',
+      '/leads': 'all-leads',
+      '/watchlist': 'watchlist',
+      '/exclusions': 'exclusions',
+      '/settings': 'settings',
+      '/integrations': 'integrations',
+      '/playbooks': 'playbooks',
+      '/faq': 'faq',
+    };
+    return map[pathname] || 'command-center';
+  };
+
+  const handleSelectView = (viewId) => {
+    setMobileSidebarOpen(false);
+    const routeMap = {
+      'command-center': '/dashboard',
+      'dashboard': '/dashboard',
+      'addy': '/agent-chat',
+      'discovery': '/discover',
+      'twin-finder': '/twin-finder',
+      'resolve': '/resolve',
+      'scheduled': '/scheduled',
+      'readiness': '/readiness',
+      'outreach': '/campaign',
+      'all-leads': '/leads',
+      'watchlist': '/watchlist',
+      'exclusions': '/exclusions',
+      'settings': '/settings',
+      'integrations': '/integrations',
+      'playbooks': '/playbooks',
+      'faq': '/faq',
+    };
+    const targetRoute = routeMap[viewId] || '/dashboard';
+    navigate(targetRoute);
+  };
+
+  // If restoring session on boot, render clean dark loading gate to prevent transient flashes/redirects
+  if (isSessionLoading) {
     return (
-      <AuthView
-        initialMode={authMode}
-        onAuthSuccess={(user) => {
-          if (user?.email) {
-            setUserAccount((prev) => ({
-              ...prev,
-              id: user.id || prev.id,
-              email: user.email,
-              plan_tier: user.plan_tier || prev.plan_tier,
-              sparks_balance: parseFloat(user.sparks_balance || prev.sparks_balance),
-              addy_messages_balance: parseInt(user.addy_messages_balance || prev.addy_messages_balance),
-              workspace_name: user.workspace_name || (user.fullName ? `${user.fullName}'s Workspace` : prev.workspace_name)
-            }));
-          }
-          setAuthMode(null);
-          setAppMode('dashboard');
-        }}
-        onCancel={() => setAuthMode(null)}
-      />
+      <div style={{
+        minHeight: '100vh',
+        background: '#000000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#ffffff',
+        fontFamily: 'system-ui, sans-serif'
+      }}>
+        <div style={{
+          width: '32px',
+          height: '32px',
+          border: '2px solid rgba(255,255,255,0.1)',
+          borderTopColor: '#e2b774',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', letterSpacing: '0.05em' }}>
+          Restoring Advibe workspace...
+        </span>
+      </div>
     );
   }
+
+  // Dashboard Shell wrapper for all protected routes
+  const DashboardLayout = ({ children, activeTitle }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    const currentActiveView = getActiveViewId(location.pathname);
+    return (
+      <div className="app-shell" style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        {/* Mobile backdrop */}
+        {mobileSidebarOpen && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <Sidebar
+          activeView={currentActiveView}
+          setActiveView={handleSelectView}
+          userAccount={userAccount}
+          openPricingModal={() => setPricingOpen(true)}
+          openOfferModal={() => setOfferOpen(true)}
+          onGoToLanding={() => navigate('/')}
+          isMobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
+        />
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', minWidth: 0, overflow: 'hidden' }}>
+          <TopBar
+            activeView={currentActiveView}
+            onSelectView={handleSelectView}
+            userAccount={userAccount}
+            onOpenOffer={() => setOfferOpen(true)}
+            onOpenPricing={() => setPricingOpen(true)}
+            onOpenSettings={() => handleSelectView('settings')}
+            onSignOut={handleSignOut}
+            onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            isMobileSidebarOpen={mobileSidebarOpen}
+          />
+
+          <main className="dashboard-viewport" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+            {activeTitle && currentActiveView !== 'addy' && currentActiveView !== 'command-center' && (
+              <div className="dashboard-header" style={{ marginBottom: '20px' }}>
+                <div className="dashboard-title-area">
+                  <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                    Advibe AI OS / {currentActiveView.toUpperCase()}
+                  </span>
+                  <h1 className="dashboard-title" style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', marginTop: '4px' }}>
+                    {activeTitle}
+                  </h1>
+                </div>
+              </div>
+            )}
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="app-root" style={{ background: '#000000', minHeight: '100vh', color: '#ffffff' }}>
@@ -186,297 +406,288 @@ export default function App() {
         />
       </div>
 
-      {/* Mode Switcher Top Bar (Dashboard Mode only) */}
-      {appMode === 'dashboard' && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '16px',
-            right: '24px',
-            zIndex: 90,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}
-        >
-          <button
-            onClick={() => setOfferOpen(true)}
-            style={{
-              background: 'rgba(226, 183, 116, 0.12)',
-              border: '1px solid rgba(226, 183, 116, 0.3)',
-              color: '#e2b774',
-              fontSize: '11px',
-              fontWeight: 600,
-              padding: '6px 12px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Tag size={12} strokeWidth={2} />
-            <span>10% Off First Month</span>
-          </button>
-
-          <button
-            onClick={() => setPricingOpen(true)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#ffffff',
-              fontSize: '11px',
-              fontWeight: 600,
-              padding: '6px 12px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Zap size={12} style={{ color: '#e2b774' }} />
-            <span>{userAccount.sparks_balance.toFixed(1)} Sparks</span>
-          </button>
-
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: '3px',
-              background: 'rgba(0,0,0,0.7)',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '20px'
-            }}
-          >
-            <button
-              onClick={() => setAppMode('dashboard')}
-              style={{
-                padding: '5px 12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                borderRadius: '16px',
-                background: appMode === 'dashboard' ? '#ffffff' : 'transparent',
-                color: appMode === 'dashboard' ? '#000000' : 'rgba(255,255,255,0.6)',
-                cursor: 'pointer'
+      <Routes>
+        {/* Public Landing Page */}
+        <Route
+          path="/"
+          element={
+            <LandingPage
+              onStartFree={() => {
+                if (isAuthenticated) {
+                  navigate('/dashboard');
+                } else {
+                  navigate('/signup');
+                }
               }}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setAppMode('landing')}
-              style={{
-                padding: '5px 12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                borderRadius: '16px',
-                background: appMode === 'landing' ? '#ffffff' : 'transparent',
-                color: appMode === 'landing' ? '#000000' : 'rgba(255,255,255,0.6)',
-                cursor: 'pointer'
-              }}
-            >
-              Overview
-            </button>
-          </div>
-        </div>
-      )}
-
-      {appMode === 'dashboard' ? (
-        /* ================= DASHBOARD APP SHELL ================= */
-        <div className="app-shell">
-          <Sidebar
-            activeView={activeView}
-            setActiveView={setActiveView}
-            userAccount={userAccount}
-            openPricingModal={() => setPricingOpen(true)}
-            openOfferModal={() => setOfferOpen(true)}
-            onGoToLanding={() => setAppMode('landing')}
-          />
-
-          <main className="dashboard-viewport">
-            {/* Top View Title for secondary views */}
-            {activeView !== 'addy' && (
-              <div className="dashboard-header">
-                <div className="dashboard-title-area">
-                  <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-                    Advibe AI OS / {activeView.toUpperCase()}
-                  </span>
-                  <h1 className="dashboard-title">
-                    {activeView === 'tracks' && 'New Search · Three Tracks'}
-                    {activeView === 'discovery' && 'Investor Discovery'}
-                    {activeView === 'twin-finder' && 'Lookalike Investors · Twin Finder'}
-                    {activeView === 'resolve' && 'Enrich a List · Resolve'}
-                    {activeView === 'scheduled' && 'Scheduled Autopilot Runs'}
-                    {activeView === 'memory' && 'Targeting Memory & Learnings'}
-                    {activeView === 'all-leads' && 'All Verified Leads'}
-                    {activeView === 'watchlist' && 'Saved Leads'}
-                    {activeView === 'saved-firms' && 'Saved Firms & Skip Lists'}
-                    {activeView === 'exclusions' && 'Exclusion & Deduplication Lists'}
-                    {activeView === 'outreach' && 'Human-In-The-Loop Outreach'}
-                    {activeView === 'integrations' && 'Integrations & Connect'}
-                    {activeView === 'settings' && 'Workspace & Account Settings'}
-                    {activeView === 'command-center' && 'Fundraising Command Center'}
-                    {activeView === 'readiness' && 'Raise Readiness Radar'}
-                    {activeView === 'faq' && 'Frequently Asked Questions'}
-                  </h1>
-                </div>
-              </div>
-            )}
-
-            {/* View Switching Router */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              {activeView === 'addy' && (
-                <AddyChat
-                  onOpenDossier={(id) => {
-                    setActiveView('tracks');
-                  }}
-                  onOpenOutreach={() => setActiveView('outreach')}
-                  refreshUserAccount={refreshAccount}
-                />
-              )}
-
-              {activeView === 'tracks' && (
-                <TracksView
-                  onOpenDossier={(id) => {}}
-                />
-              )}
-
-              {activeView === 'twin-finder' && (
-                <TwinFinderView onTriggerResolve={handleTwinFinderToResolve} />
-              )}
-
-              {activeView === 'resolve' && (
-                <ResolveView initialFirmsText={resolveInitialFirms} />
-              )}
-
-              {activeView === 'pulse' && <PulseCrmView />}
-
-              {activeView === 'scheduled' && (
-                <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-                  <div style={{ background: 'rgba(20,20,20,0.65)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '24px' }}>
-                    <h3 style={{ fontSize: '18px', color: '#ffffff', marginBottom: '8px' }}>Active Scheduled Run</h3>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5', marginBottom: '18px' }}>
-                      Every Monday at 09:00 UTC, ADDY automatically evaluates your brief and delivers 25 fresh, deduplicated leads into your active campaign.
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px', marginBottom: '20px' }}>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
-                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Cadence</div>
-                        <div style={{ fontWeight: 600, color: '#ffffff', marginTop: '2px' }}>Weekly (Mondays)</div>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
-                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Batch Size</div>
-                        <div style={{ fontWeight: 600, color: '#ffffff', marginTop: '2px' }}>25 fresh contacts</div>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
-                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Target Track</div>
-                        <div style={{ fontWeight: 600, color: '#e2b774', marginTop: '2px' }}>Venture Track</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => alert('Scheduled recipe settings updated!')}
-                      className="btn btn-solid"
-                      style={{ padding: '8px 18px', fontSize: '12.5px', background: '#ffffff', color: '#000', fontWeight: 600, borderRadius: '6px' }}
-                    >
-                      Pause Autopilot
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeView === 'memory' && <MemoryView />}
-
-              {activeView === 'discovery' && <TracksView />}
-
-              {activeView === 'all-leads' && <TracksView />}
-
-              {activeView === 'watchlist' && <WatchlistView />}
-
-              {activeView === 'saved-firms' && <WatchlistView />}
-
-              {activeView === 'settings' && (
-                <SettingsView
-                  userAccount={userAccount}
-                  openPricingModal={() => setPricingOpen(true)}
-                  refreshUserAccount={refreshAccount}
-                />
-              )}
-
-              {activeView === 'all-searches' && (
-                <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', textAlign: 'center', padding: '60px 0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px', color: 'rgba(255,255,255,0.35)' }}>
-                    <ListFilter size={36} strokeWidth={1.5} />
-                  </div>
-                  <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>Search History</h3>
-                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-                    Past queries executed across Venture, Real Estate, and LP tracks.
-                  </p>
-                </div>
-              )}
-
-              {activeView === 'exclusions' && <ExclusionsView />}
-
-              {activeView === 'outreach' && (
-                <OutreachView userAccount={userAccount} refreshUserAccount={refreshAccount} />
-              )}
-
-              {activeView === 'command-center' && <CommandCenterView />}
-
-              {activeView === 'readiness' && (
-                <RaiseReadinessView userAccount={userAccount} />
-              )}
-
-              {activeView === 'playbooks' && (
-                <PlaybookLibraryView
-                  userAccount={userAccount}
-                  refreshUserAccount={refreshAccount}
-                  openPricingModal={() => setPricingOpen(true)}
-                />
-              )}
-
-              {activeView === 'integrations' && <IntegrationsView />}
-
-              {activeView === 'faq' && <FaqAccordion />}
-            </div>
-          </main>
-        </div>
-      ) : (
-        <LandingPage
-          onStartFree={() => {
-            setAppMode('dashboard');
-            setActiveView('addy');
-          }}
-          onOpenLogin={() => setAuthMode('login')}
-          onOpenSignup={() => setAuthMode('signup')}
-          onOpenPricing={() => setPricingOpen(true)}
-          onOpenOffer={() => setOfferOpen(true)}
-          onOpenTracks={() => {
-            setAppMode('dashboard');
-            setActiveView('tracks');
-          }}
-          onOpenTwinFinder={() => {
-            setAppMode('dashboard');
-            setActiveView('twin-finder');
-          }}
-          onOpenResolve={() => {
-            setAppMode('dashboard');
-            setActiveView('resolve');
-          }}
-          liveStats={liveStats}
+              onOpenLogin={() => navigate('/login')}
+              onOpenSignup={() => navigate('/signup')}
+              onOpenPricing={() => setPricingOpen(true)}
+              onOpenOffer={() => setOfferOpen(true)}
+              onOpenTracks={() => navigate('/discover')}
+              onOpenTwinFinder={() => navigate('/twin-finder')}
+              onOpenResolve={() => navigate('/resolve')}
+              liveStats={liveStats}
+            />
+          }
         />
-      )}
+
+        {/* Auth Routes */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <AuthView
+                initialMode="login"
+                onAuthSuccess={handleAuthSuccess}
+                onCancel={() => navigate('/')}
+              />
+            )
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <AuthView
+                initialMode="signup"
+                onAuthSuccess={handleAuthSuccess}
+                onCancel={() => navigate('/')}
+              />
+            )
+          }
+        />
+
+        {/* Phone Verification Gate Route */}
+        <Route
+          path="/verify-phone"
+          element={
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : userAccount?.phone_verified_at ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <PhoneVerificationView
+                userAccount={userAccount}
+                onVerificationSuccess={(updatedData) => {
+                  setUserAccount((prev) => ({
+                    ...prev,
+                    ...updatedData,
+                    phone_verified_at: updatedData.phone_verified_at || new Date().toISOString()
+                  }));
+                  refreshAccount();
+                  navigate('/dashboard');
+                }}
+                onSignOut={handleSignOut}
+              />
+            )
+          }
+        />
+
+        {/* Protected Dashboard Views */}
+        <Route
+          path="/dashboard"
+          element={
+            <DashboardLayout activeTitle="Fundraising Command Center">
+              <CommandCenterView />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/command-center"
+          element={<Navigate to="/dashboard" replace />}
+        />
+        <Route
+          path="/agent-chat"
+          element={
+            <DashboardLayout activeTitle="Advibe AI Agent Chat">
+              <AddyChat
+                onOpenDossier={() => navigate('/discover')}
+                onOpenOutreach={() => navigate('/campaign')}
+                refreshUserAccount={refreshAccount}
+              />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/discover"
+          element={
+            <DashboardLayout activeTitle="Investor Discovery">
+              <TracksView onOpenDossier={() => {}} />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/twin-finder"
+          element={
+            <DashboardLayout activeTitle="Lookalike Investors · Twin Finder">
+              <TwinFinderView onTriggerResolve={handleTwinFinderToResolve} />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/resolve"
+          element={
+            <DashboardLayout activeTitle="Enrich a List · Resolve">
+              <ResolveView initialFirmsText={resolveInitialFirms} />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/scheduled"
+          element={
+            <DashboardLayout activeTitle="Scheduled Autopilot Runs">
+              <ScheduledRunsView
+                onOpenTracks={() => navigate('/discover')}
+                onOpenOutreach={() => navigate('/campaign')}
+              />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/readiness"
+          element={
+            <DashboardLayout activeTitle="Raise Readiness Radar">
+              <RaiseReadinessView userAccount={userAccount} openModal={setActiveModal} />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/campaign"
+          element={
+            <DashboardLayout activeTitle="Human-In-The-Loop Outreach">
+              <OutreachView userAccount={userAccount} refreshUserAccount={refreshAccount} />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/leads"
+          element={
+            <DashboardLayout activeTitle="All Verified Leads">
+              <AllLeadsView
+                openPricingModal={() => setPricingOpen(true)}
+                refreshUserAccount={refreshAccount}
+              />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/watchlist"
+          element={
+            <DashboardLayout activeTitle="Saved Leads">
+              <WatchlistView />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/exclusions"
+          element={
+            <DashboardLayout activeTitle="Exclusion &amp; Deduplication Lists">
+              <ExclusionsView />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <DashboardLayout activeTitle="Workspace &amp; Account Settings">
+              <SettingsView
+                userAccount={userAccount}
+                openPricingModal={() => setPricingOpen(true)}
+                refreshUserAccount={refreshAccount}
+              />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/integrations"
+          element={
+            <DashboardLayout activeTitle="Integrations &amp; Connect">
+              <IntegrationsView />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/playbooks"
+          element={
+            <DashboardLayout activeTitle="Playbook Library">
+              <PlaybookLibraryView
+                userAccount={userAccount}
+                refreshUserAccount={refreshAccount}
+                openPricingModal={() => setPricingOpen(true)}
+              />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/faq"
+          element={
+            <DashboardLayout activeTitle="Frequently Asked Questions">
+              <FaqAccordion />
+            </DashboardLayout>
+          }
+        />
+
+        {/* 404 Fallback Catch-All */}
+        <Route
+          path="*"
+          element={
+            <div style={{
+              minHeight: '100vh',
+              background: '#000000',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              textAlign: 'center',
+              fontFamily: 'system-ui, sans-serif'
+            }}>
+              <span style={{ fontSize: '12px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#e2b774', fontWeight: 600 }}>
+                404 Not Found
+              </span>
+              <h2 style={{ fontSize: '28px', fontWeight: 700, color: '#ffffff', margin: '12px 0 8px' }}>
+                Page not found
+              </h2>
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', maxWidth: '420px', lineHeight: '1.5', marginBottom: '24px' }}>
+                The URL you requested doesn't exist or has moved. Return to the dashboard to continue.
+              </p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                style={{
+                  background: '#ffffff',
+                  color: '#000000',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none'
+                }}
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          }
+        />
+      </Routes>
 
       {/* Pricing Modal */}
       <PricingModal
         isOpen={pricingOpen}
         onClose={() => setPricingOpen(false)}
         userAccount={userAccount}
+        refreshUserAccount={refreshAccount}
       />
 
       {/* One Time 10% Off Offer Modal */}
       <OneTimeOfferModal
         isOpen={offerOpen}
         onClose={() => setOfferOpen(false)}
-        onClaimSuccess={(res) => {
+        onClaimSuccess={() => {
           refreshAccount();
         }}
       />

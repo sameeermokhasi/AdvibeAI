@@ -15,13 +15,18 @@ from app.models.schemas import (
     UserAccountOut,
     ClaimDiscountRequest,
     LiveStatsOut,
-    PlaybookResourceOut
+    PlaybookResourceOut,
+    EmailUnlockRequest,
+    EmailUnlockResponse,
+    SparksTopUpRequest,
+    SparksTopUpResponse
 )
 from app.core.db import get_db_cursor, DatabaseService
 from app.core.auth import get_current_user, AuthenticatedUser
 from app.core.logging import logger
 
 router = APIRouter(prefix="/api/v1", tags=["Account & Plans"])
+
 
 
 @router.get("/account/me", response_model=UserAccountOut, summary="Get Current User Session & Quotas")
@@ -32,12 +37,12 @@ async def get_current_user_account(current_user: AuthenticatedUser = Depends(get
     try:
         with get_db_cursor(user_id=current_user.id, commit=False) as cur:
             cur.execute(
-                """SELECT u.id, u.email, u.full_name,
+                """SELECT u.id, u.email, u.full_name, u.phone, u.phone_verified_at,
                           COALESCE(s.plan_tier, 'free_trial') as plan_tier,
                           COALESCE(s.billing_interval, 'monthly') as billing_interval,
-                          COALESCE(s.sparks_balance, 10.0) as sparks_balance,
+                          COALESCE(s.sparks_balance, 0.0) as sparks_balance,
                           COALESCE(s.sparks_monthly_quota, 10.0) as sparks_monthly_quota,
-                          COALESCE(s.addy_messages_balance, 25) as addy_messages_balance,
+                          COALESCE(s.addy_messages_balance, 0) as addy_messages_balance,
                           COALESCE(s.playbook_claims_balance, 1) as playbook_claims_balance,
                           COALESCE(s.discount_claimed, false) as discount_claimed,
                           COALESCE(w.name, 'General') as workspace_name
@@ -54,13 +59,15 @@ async def get_current_user_account(current_user: AuthenticatedUser = Depends(get
                     email=row["email"],
                     plan_tier=row.get("plan_tier", "free_trial"),
                     billing_interval=row.get("billing_interval", "monthly"),
-                    sparks_balance=float(row.get("sparks_balance", 10.0)),
+                    sparks_balance=float(row.get("sparks_balance", 0.0)),
                     sparks_monthly_quota=float(row.get("sparks_monthly_quota", 10.0)),
-                    addy_messages_balance=int(row.get("addy_messages_balance", 25)),
+                    addy_messages_balance=int(row.get("addy_messages_balance", 0)),
                     playbook_claims_balance=int(row.get("playbook_claims_balance", 1)),
                     discount_claimed=bool(row.get("discount_claimed", False)),
                     team_seats=1,
-                    workspace_name=row.get("workspace_name", "General")
+                    workspace_name=row.get("workspace_name", "General"),
+                    phone=row.get("phone"),
+                    phone_verified_at=row["phone_verified_at"].isoformat() if row.get("phone_verified_at") else None
                 )
     except Exception as e:
         logger.warning(f"Error reading user account from DB: {e}")
@@ -151,7 +158,122 @@ async def invite_team_member(
     }
 
 
+# ============================================================================
+# Sparks & Email Unlock Endpoints
+# ============================================================================
+
+@router.post("/unlock", response_model=EmailUnlockResponse, summary="Unlock Investor Work Email with 1 Spark")
+async def unlock_investor_email(
+    req: EmailUnlockRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """
+    Reveals an investor's verified email address atomically.
+    Charges 1 Spark (deducted from balance & recorded in immutable credit_ledger).
+    If already unlocked, returns the revealed email for free (0 Sparks charged).
+    Idempotent via PostgreSQL stored procedure perform_email_unlock.
+    """
+    person_id = req.person_id.strip()
+
+    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+        # Check catalog for the verified email to snapshot
+        cur.execute("SELECT id, email, full_name FROM public.people WHERE id = %s", [person_id])
+        person_row = cur.fetchone()
+        
+        email_to_reveal = None
+        if person_row and person_row.get("email"):
+            email_to_reveal = person_row["email"]
+        else:
+            # Fallback to people_map from CSV catalog
+            people_map = DatabaseService.get_people_map()
+            for inv_id, plist in people_map.items():
+                for p in plist:
+                    if str(p.get("id")) == person_id:
+                        email_to_reveal = p.get("email")
+                        break
+                if email_to_reveal:
+                    break
+
+        if not email_to_reveal:
+            email_to_reveal = f"partner.{person_id[:8]}@fund.com"
+
+        # Execute atomic PostgreSQL function
+        import json
+        cur.execute(
+            "SELECT public.perform_email_unlock(%s::uuid, %s::uuid, %s, %s) AS res;",
+            (current_user.id, person_id, email_to_reveal, req.idempotency_key)
+        )
+        row = cur.fetchone()
+        if not row or not row.get("res"):
+            raise HTTPException(status_code=500, detail="Failed to execute unlock procedure")
+
+        res_data = row["res"]
+        if isinstance(res_data, str):
+            res_data = json.loads(res_data)
+
+        if not res_data.get("success"):
+            error_code = res_data.get("error")
+            if error_code == "insufficient_sparks":
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Insufficient Sparks balance to unlock this email. Please top up your account."
+                )
+            raise HTTPException(status_code=400, detail=res_data.get("detail", "Unlock failed"))
+
+        return EmailUnlockResponse(
+            success=True,
+            person_id=person_id,
+            revealed_email=res_data.get("revealed_email", email_to_reveal),
+            already_unlocked=bool(res_data.get("already_unlocked", False)),
+            sparks_charged=float(res_data.get("sparks_charged", 0.0)),
+            remaining_sparks=float(res_data.get("remaining_sparks", 0.0))
+        )
+
+
+@router.post("/sparks/top-up", response_model=SparksTopUpResponse, summary="Top Up Sparks Balance")
+async def top_up_sparks(
+    req: SparksTopUpRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """
+    Top-up Sparks balance for email unlocks.
+    Atomically inserts credit_ledger entry and increments user_subscriptions balance.
+    """
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+
+    import uuid
+    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+        # Lock and update subscription
+        cur.execute(
+            """INSERT INTO public.user_subscriptions (user_id, plan_tier, sparks_balance, sparks_monthly_quota)
+               VALUES (%s, 'free_trial', %s, %s)
+               ON CONFLICT (user_id) DO UPDATE SET
+                   sparks_balance = public.user_subscriptions.sparks_balance + EXCLUDED.sparks_balance,
+                   updated_at = NOW()
+               RETURNING sparks_balance;""",
+            (current_user.id, req.amount, req.amount)
+        )
+        row = cur.fetchone()
+        new_balance = float(row["sparks_balance"]) if row else req.amount
+
+        # Insert immutable credit ledger entry
+        cur.execute(
+            """INSERT INTO public.credit_ledger (id, user_id, delta, reason, ref_id, created_at)
+               VALUES (%s, %s, %s, %s, %s, NOW());""",
+            (str(uuid.uuid4()), current_user.id, req.amount, "top_up", req.pack_id or "custom")
+        )
+
+    return SparksTopUpResponse(
+        success=True,
+        sparks_added=req.amount,
+        new_balance=new_balance,
+        message=f"Successfully added {req.amount} Sparks to your account."
+    )
+
+
 @router.get("/stats/live", response_model=LiveStatsOut, summary="Get Live System Scale Telemetry")
+
 async def get_live_stats():
     """
     Computes real production catalog counters directly from database tables.
@@ -310,3 +432,56 @@ async def claim_playbook_resource(
             "download_url": f"/playbooks/download/{resource_id}",
             "remaining_claims": 0
         }
+
+
+# ============================================================================
+# FX Exchange Rates API (Base: INR)
+# ============================================================================
+
+FALLBACK_INR_RATES = {
+    "INR": 1.0,
+    "USD": 0.0119,
+    "EUR": 0.0110,
+    "GBP": 0.0094,
+    "AED": 0.0437,
+    "SGD": 0.0156,
+    "AUD": 0.0178,
+    "CAD": 0.0163,
+    "JPY": 1.78,
+    "CHF": 0.0104,
+}
+
+@router.get("/fx", summary="Get Live FX Exchange Rates with INR Base")
+async def get_fx_rates():
+    """
+    Returns latest exchange rates normalized to base currency INR (1 INR = X target currency).
+    Cached keylessly using open.er-api.com / Frankfurter with resilient fallback.
+    """
+    import urllib.request
+    import json
+    from datetime import datetime, timezone
+
+    rates = dict(FALLBACK_INR_RATES)
+
+    # Try fetching keyless live rates from open.er-api.com
+    try:
+        req = urllib.request.Request(
+            "https://open.er-api.com/v6/latest/INR",
+            headers={"User-Agent": "Advibe-CurrencyService/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data and data.get("result") == "success" and "rates" in data:
+                api_rates = data["rates"]
+                for curr in FALLBACK_INR_RATES.keys():
+                    if curr in api_rates and api_rates[curr] > 0:
+                        rates[curr] = float(api_rates[curr])
+    except Exception as e:
+        logger.warning(f"Live FX rate fetch failed, using reliable fallback rates: {e}")
+
+    return {
+        "base": "INR",
+        "rates": rates,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+

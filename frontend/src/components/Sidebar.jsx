@@ -28,7 +28,9 @@ export default function Sidebar({
   userAccount,
   openPricingModal,
   openOfferModal,
-  onGoToLanding
+  onGoToLanding,
+  isMobileOpen = false,
+  onMobileClose
 }) {
   const [workspace, setWorkspace] = useState('General');
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
@@ -42,12 +44,10 @@ export default function Sidebar({
       title: 'WORKSPACE',
       items: [
         { id: 'addy', label: 'Agent (Chat)', icon: Sparkles },
-        { id: 'tracks', label: 'New Search', icon: Search },
         { id: 'discovery', label: 'Discover', icon: Globe },
         { id: 'twin-finder', label: 'Lookalike investors', icon: Crosshair },
         { id: 'resolve', label: 'Enrich a list', icon: Zap },
-        { id: 'scheduled', label: 'Scheduled', icon: Clock },
-        { id: 'memory', label: 'Memory', icon: Brain }
+        { id: 'scheduled', label: 'Scheduled', icon: Clock }
       ]
     },
     {
@@ -63,16 +63,16 @@ export default function Sidebar({
       items: [
         { id: 'all-leads', label: 'All leads', icon: Users },
         { id: 'watchlist', label: 'Saved leads', icon: Bookmark },
-        { id: 'saved-firms', label: 'Saved firms', icon: Building2 },
         { id: 'exclusions', label: 'Exclusions', icon: Ban },
         { id: 'settings', label: 'Settings', icon: SlidersHorizontal }
       ]
     }
   ];
 
+
   return (
     <aside
-      className="sidebar"
+      className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
       style={{
         width: '230px',
         background: '#0a0a0a',

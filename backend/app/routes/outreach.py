@@ -73,10 +73,15 @@ async def create_drafts(payload: DraftRequest, current_user: AuthenticatedUser =
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ''', (msg_id, campaign_id, person_id, p_row['inv_id'], channel_str, draft_content["subject"], draft_content["body"], 'draft', now_dt))
 
+                    from app.core.security import mask_email, get_unlocked_person_ids
+                    unlocked_ids = get_unlocked_person_ids(current_user.id)
+                    is_unlocked = str(person_id) in unlocked_ids
+                    safe_email = p_row['email'] if is_unlocked else mask_email(p_row['email'])
+
                     drafts.append(MessageDraft(
                         id=msg_id, message_id=msg_id, campaign_id=campaign_id, person_id=person_id,
                         investor_id=p_row['inv_id'], recipient_name=p_row['full_name'], recipient_role=p_row['role_title'],
-                        recipient_email=p_row['email'], firm_name=p_row['firm_name'], channel=payload.channel,
+                        recipient_email=safe_email, firm_name=p_row['firm_name'], channel=payload.channel,
                         subject=draft_content["subject"], body=draft_content["body"], status=MessageStatus.DRAFT, created_at=now_dt
                     ))
 

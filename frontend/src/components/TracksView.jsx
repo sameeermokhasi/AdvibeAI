@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Bookmark, CheckCircle2, Mail, ExternalLink, ShieldCheck, ArrowRight, RefreshCw, Filter } from 'lucide-react';
-import { getTrackInvestors, getInvestorDossier, addToWatchlist } from '../lib/api';
+import { X, Search, Bookmark, CheckCircle2, Mail, ExternalLink, ShieldCheck, ArrowRight, RefreshCw, Filter, Lock, Zap } from 'lucide-react';
+import { getTrackInvestors, getInvestorDossier, addToWatchlist, unlockInvestorEmail } from '../lib/api';
+import { formatMoney, convertUSDToINR, getActiveCurrency, subscribeCurrency } from '../lib/money';
 
-export default function TracksView({ onOpenDossier, onOpenOutreach }) {
+export default function TracksView({ onOpenDossier, onOpenOutreach, openPricingModal, refreshUserAccount }) {
   const [currentTrack, setCurrentTrack] = useState('venture'); // 'venture' | 'real_estate' | 'fund_lp'
   const [investors, setInvestors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedDossier, setSelectedDossier] = useState(null);
   const [dossierLoading, setDossierLoading] = useState(false);
+  const [pendingUnlockPerson, setPendingUnlockPerson] = useState(null);
+  const [unlockingId, setUnlockingId] = useState(null);
+  const [currency, setCurrency] = useState(getActiveCurrency());
+
+  useEffect(() => {
+    return subscribeCurrency((curr) => setCurrency(curr));
+  }, []);
+
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +66,47 @@ export default function TracksView({ onOpenDossier, onOpenOutreach }) {
     }
   };
 
+  const handleConfirmUnlock = async () => {
+    if (!pendingUnlockPerson) return;
+    const person = pendingUnlockPerson;
+    setPendingUnlockPerson(null);
+    setUnlockingId(person.id);
+
+    try {
+      const res = await unlockInvestorEmail(person.id);
+      if (res.success) {
+        showToast(`Email revealed: ${res.revealed_email}`);
+        setInvestors((prev) =>
+          prev.map((inv) => ({
+            ...inv,
+            people: (inv.people || []).map((p) =>
+              p.id === person.id ? { ...p, email: res.revealed_email, is_unlocked: true } : p
+            )
+          }))
+        );
+        if (selectedDossier && selectedDossier.people) {
+          setSelectedDossier((prev) => ({
+            ...prev,
+            people: (prev.people || []).map((p) =>
+              p.id === person.id ? { ...p, email: res.revealed_email, is_unlocked: true } : p
+            )
+          }));
+        }
+        if (refreshUserAccount) refreshUserAccount();
+      }
+    } catch (err) {
+      if (err.status === 402 || (err.message && err.message.toLowerCase().includes('insufficient'))) {
+        showToast('Insufficient Sparks. Please top up to reveal.');
+        if (openPricingModal) openPricingModal();
+      } else {
+        alert(err.message || 'Unlock failed');
+      }
+    } finally {
+      setUnlockingId(null);
+    }
+  };
+
+
   const handleToggleBookmark = async (e, inv) => {
     e.stopPropagation();
     const isSaved = bookmarkedIds[inv.id];
@@ -96,7 +146,7 @@ export default function TracksView({ onOpenDossier, onOpenOutreach }) {
           position: 'fixed',
           top: '24px',
           right: '24px',
-          zIndex: 200,
+          zIndex: 250,
           background: 'rgba(20, 20, 20, 0.95)',
           border: '1px solid #4ade80',
           borderRadius: '8px',
@@ -114,6 +164,76 @@ export default function TracksView({ onOpenDossier, onOpenOutreach }) {
           {toastMessage}
         </div>
       )}
+
+      {/* Unlock Confirmation Modal */}
+      {pendingUnlockPerson && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 350,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#121212',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '440px',
+            width: '100%',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.8)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(226,183,116,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2b774' }}>
+                <Zap size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>Reveal Work Email</h3>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>Costs 1.0 Spark</span>
+              </div>
+            </div>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '18px' }}>
+              Reveal the verified work email for <strong>{pendingUnlockPerson.full_name}</strong>. Deducts 1 Spark from your balance.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setPendingUnlockPerson(null)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '12.5px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUnlock}
+                style={{
+                  padding: '8px 18px',
+                  background: '#e2b774',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#000000',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                  cursor: 'pointer'
+                }}
+              >
+                Confirm &amp; Unlock (1 Spark)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Track Selector Tabs */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px' }}>
@@ -409,14 +529,39 @@ export default function TracksView({ onOpenDossier, onOpenOutreach }) {
                     <div style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff' }}>
                       {primaryPartner.full_name}
                     </div>
-                    {primaryPartner.verified && (
-                      <span style={{ fontSize: '10px', color: '#4ade80', fontWeight: 600 }}>✓ SMTP</span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {primaryPartner.verified && (
+                        <span style={{ fontSize: '10px', color: '#4ade80', fontWeight: 600 }}>✓ SMTP</span>
+                      )}
+                      {!primaryPartner.is_unlocked && primaryPartner.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingUnlockPerson(primaryPartner);
+                          }}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '10.5px',
+                            background: 'rgba(226,183,116,0.12)',
+                            border: '1px solid rgba(226,183,116,0.3)',
+                            borderRadius: '4px',
+                            color: '#e2b774',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <Lock size={10} />
+                          Unlock
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
                     {primaryPartner.role_title}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#e2b774', marginTop: '4px' }}>
+                  <div style={{ fontSize: '11px', fontFamily: 'monospace', color: primaryPartner.is_unlocked ? '#4ade80' : '#e2b774', marginTop: '4px' }}>
                     {primaryPartner.email}
                   </div>
                 </div>
@@ -519,7 +664,9 @@ export default function TracksView({ onOpenDossier, onOpenOutreach }) {
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '6px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Check Sizes</div>
                 <div style={{ fontWeight: 600, color: '#ffffff', marginTop: '2px', fontSize: '13px' }}>
-                  {selectedDossier.check_size_min ? `$${(selectedDossier.check_size_min/1000).toFixed(0)}K - $${(selectedDossier.check_size_max/1000000).toFixed(1)}M` : '$500K - $3M'}
+                  {selectedDossier.check_size_min
+                    ? `${formatMoney(convertUSDToINR(selectedDossier.check_size_min), currency, { compact: true })} - ${formatMoney(convertUSDToINR(selectedDossier.check_size_max), currency, { compact: true })}`
+                    : `${formatMoney(convertUSDToINR(500000), currency, { compact: true })} - ${formatMoney(convertUSDToINR(3000000), currency, { compact: true })}`}
                 </div>
               </div>
 

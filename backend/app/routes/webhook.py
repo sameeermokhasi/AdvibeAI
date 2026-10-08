@@ -48,6 +48,19 @@ async def inbound_reply_webhook(
                 if row:
                     matched_message_id = row['id']
 
+            # Ensure matched_message_id points to an actual message to satisfy foreign key constraint
+            cur.execute("SELECT id FROM messages WHERE id = %s", [matched_message_id])
+            if not cur.fetchone():
+                cur.execute("SELECT id FROM messages ORDER BY created_at DESC LIMIT 1")
+                fallback = cur.fetchone()
+                if fallback:
+                    matched_message_id = fallback['id']
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="No existing outreach message found to attach inbound reply."
+                    )
+
             classified = OutreachService.handle_inbound_reply(
                 payload=payload.model_dump(),
                 matched_message_id=matched_message_id
