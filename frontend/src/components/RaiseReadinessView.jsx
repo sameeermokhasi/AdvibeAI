@@ -15,9 +15,14 @@ export default function RaiseReadinessView({ userAccount, openModal }) {
       const res = await getRaiseReadiness();
       setData(res);
     } catch (err) {
-      setError({
-        status: err.status || 500,
-        message: err.message || 'Failed to communicate with Readiness Radar service'
+      console.warn('Readiness radar data load:', err);
+      setData({
+        has_data: false,
+        has_profile: false,
+        has_deck: false,
+        company: null,
+        evaluation: null,
+        message: 'No company profile or pitch deck found for this workspace. Please add a company profile or upload a pitch deck to generate your Raise Readiness Radar.'
       });
     } finally {
       setLoading(false);

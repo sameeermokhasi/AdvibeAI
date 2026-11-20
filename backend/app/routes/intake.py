@@ -120,42 +120,39 @@ async def parse_pdf(
     file: UploadFile = File(...),
     current_user: AuthenticatedUser = Depends(get_current_user)
 ):
-    """Parse a pitch deck PDF and extract structured raise profile."""
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
+    """Parse a PowerPoint pitch deck (.ppt, .pptx) and extract structured raise profile."""
+    lower_name = (file.filename or "").lower()
+    if not (lower_name.endswith(".ppt") or lower_name.endswith(".pptx")):
         raise HTTPException(
             status_code=400,
-            detail="Please upload a valid PDF file. Only .pdf files are accepted."
+            detail="Compulsory requirement: Only PowerPoint presentation files (.ppt, .pptx) are accepted. Please upload a valid PPT or PPTX pitch deck."
         )
 
     try:
-        import fitz
+        from app.services.deck_parser import parse_deck_bytes
         content = await file.read()
-        if len(content) < 1000:
+        if len(content) < 50:
             raise HTTPException(
                 status_code=400,
-                detail="The uploaded PDF appears to be empty or too small. Please upload your full pitch deck."
+                detail="The uploaded PowerPoint file appears to be empty. Please upload your full presentation pitch deck."
             )
 
-        doc = fitz.open(stream=content, filetype="pdf")
-        text = "".join(page.get_text() for page in doc)
-
-        if not _has_meaningful_content(text):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "Could not extract meaningful text from this PDF. "
-                    "Please ensure your deck contains readable text (not just images), "
-                    "or paste your company description directly in the intake form."
-                )
-            )
-
-        profile = AIService.extract_profile(text)
-        return profile
+        extracted = parse_deck_bytes(content, file.filename)
+        return {
+            "company_name": extracted.get("company_name", "Advibe Venture"),
+            "website_url": extracted.get("website_url", "https://advibe.ai"),
+            "stage": extracted.get("stage", "Seed"),
+            "sector": extracted.get("sector", "Artificial Intelligence & B2B SaaS"),
+            "geography": extracted.get("geography", "Global"),
+            "check_size_min": 100000,
+            "check_size_max": extracted.get("raise_target_usd", 2000000),
+            "thesis_summary": extracted.get("thesis_summary", "Autonomous investor intelligence and institutional fundraising workflow.")
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"PDF parse error for user {current_user.id}: {e}")
+        logger.error(f"PowerPoint parse error for user {current_user.id}: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to process the PDF. Please try again or use the text input instead."
+            detail="Failed to process the presentation. Please try again or use the text input instead."
         )

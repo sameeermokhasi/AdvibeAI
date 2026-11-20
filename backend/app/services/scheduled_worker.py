@@ -10,7 +10,7 @@ and handles server restart resumption gracefully.
 import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
-from app.core.db import get_db_cursor, DatabaseService
+from app.core.db import get_db_cursor, DatabaseService, is_db_available
 from app.core.logging import logger
 
 _worker_task: asyncio.Task = None
@@ -66,6 +66,10 @@ async def scheduled_worker_loop():
     logger.info("[ScheduledAutopilot] Background worker started.")
     while _running:
         try:
+            if not is_db_available():
+                await asyncio.sleep(10)
+                continue
+
             with get_db_cursor(commit=False) as cur:
                 # Find jobs that are 'pending' or 'running'
                 cur.execute(

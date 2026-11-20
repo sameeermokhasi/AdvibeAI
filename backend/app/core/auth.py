@@ -37,6 +37,19 @@ async def get_current_user(
 
     token = credentials.credentials
 
+    # Fast-path for development and OAuth fallback tokens
+    if settings.ENVIRONMENT == "development" and (
+        token.startswith("oauth_") or token.startswith("oauth-") or
+        token.startswith("dev-") or token.startswith("test-") or "mock" in token
+    ):
+        return AuthenticatedUser(
+            id="00000000-0000-0000-0000-000000000001",
+            email="founder@advibe.ai",
+            token=token,
+            phone_verified=True,
+            phone="+919999999999"
+        )
+
     try:
         header = jwt.get_unverified_header(token)
         alg = header.get("alg", "HS256")
@@ -131,7 +144,7 @@ async def get_current_user(
     except jwt.PyJWTError as e:
         logger.warning(f"JWT Validation error: {str(e)}")
         if settings.ENVIRONMENT == "development" and (
-            token.startswith("dev-") or token.startswith("test-") or "mock" in token
+            token.startswith("dev-") or token.startswith("test-") or token.startswith("oauth_") or token.startswith("oauth-") or "mock" in token
         ):
             return AuthenticatedUser(
                 id="00000000-0000-0000-0000-000000000001",

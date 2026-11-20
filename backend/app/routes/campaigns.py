@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 from datetime import datetime, timezone
+import uuid
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.auth import get_current_user, AuthenticatedUser
@@ -128,10 +129,15 @@ async def disconnect_heyreach(current_user: AuthenticatedUser = Depends(get_curr
 
 @router.get("/{company_id}", response_model=List[CampaignStatusOut])
 async def get_company_campaigns(company_id: str, current_user: AuthenticatedUser = Depends(get_current_user)):
+    try:
+        valid_company_id = uuid.UUID(str(company_id))
+    except (ValueError, TypeError, AttributeError):
+        return []
+
     unlocked_ids = get_unlocked_person_ids(current_user.id)
     try:
         with get_db_cursor(user_id=current_user.id, commit=False) as cur:
-            cur.execute("SELECT * FROM campaigns WHERE company_id = %s", [company_id])
+            cur.execute("SELECT * FROM campaigns WHERE company_id = %s", [str(valid_company_id)])
             campaigns = cur.fetchall()
 
             results = []

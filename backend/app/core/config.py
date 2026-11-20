@@ -69,5 +69,8 @@ class Settings(BaseSettings):
     # Manual QR Fallback (Default False)
     MANUAL_QR_ENABLED: bool = os.getenv("MANUAL_QR_ENABLED", "false").lower() in ("true", "1", "yes")
 
+    # Admin Emails for Payment Approvals & Dashboard
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "founder@advibe.ai,admin@advibe.ai,sameer.mokhasi022@gmail.com")
+
 settings = Settings()
 

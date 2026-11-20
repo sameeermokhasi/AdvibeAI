@@ -112,3 +112,96 @@ async def remove_from_watchlist(
     except Exception as e:
         logger.error(f"Remove watchlist error: {e}")
         raise HTTPException(500, "Failed to remove from watchlist")
+
+
+leads_router = APIRouter(prefix="/api/v1/leads", tags=["Leads"])
+
+@leads_router.get("")
+async def get_all_leads(
+    filter: str = "all",
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    selected_filter = filter.lower() if filter.lower() in {"all", "saved", "unlocked"} else "all"
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=False) as cur:
+            cur.execute(
+                """
+                WITH user_saved AS (
+                    SELECT person_id, MAX(notes) as notes, MAX(created_at) as saved_at
+                    FROM public.watchlist
+                    WHERE user_id = %s::uuid
+                    GROUP BY person_id
+                ),
+                user_unlocked AS (
+                    SELECT person_id, MAX(revealed_email) as revealed_email, MAX(unlocked_at) as unlocked_at
+                    FROM public.investor_unlocks
+                    WHERE user_id = %s::uuid
+                    GROUP BY person_id
+                )
+                SELECT 
+                    p.id as person_id,
+                    p.full_name as investor_name,
+                    p.role_title,
+                    p.email as raw_email,
+                    p.linkedin_url,
+                    i.id as firm_id,
+                    i.firm_name,
+                    i.fund_type,
+                    i.aum,
+                    COALESCE(array_to_string(i.geography_focus, ', '), 'Global') as location,
+                    i.stage_focus,
+                    i.sector_focus,
+                    (s.person_id IS NOT NULL) as is_saved,
+                    (u.person_id IS NOT NULL) as is_unlocked,
+                    u.revealed_email,
+                    s.notes,
+                    COALESCE(u.unlocked_at, s.saved_at) as activity_at
+                FROM public.people p
+                LEFT JOIN public.investors i ON p.investor_id = i.id
+                LEFT JOIN user_saved s ON p.id = s.person_id
+                LEFT JOIN user_unlocked u ON p.id = u.person_id
+                WHERE (
+                    CASE 
+                        WHEN %s = 'saved' THEN s.person_id IS NOT NULL
+                        WHEN %s = 'unlocked' THEN u.person_id IS NOT NULL
+                        ELSE (s.person_id IS NOT NULL OR u.person_id IS NOT NULL)
+                    END
+                )
+                ORDER BY COALESCE(u.unlocked_at, s.saved_at) DESC;
+                """,
+                (current_user.id, current_user.id, selected_filter, selected_filter)
+            )
+            rows = cur.fetchall()
+            results = []
+            for r in rows:
+                pid = str(r["person_id"])
+                is_unlocked = bool(r.get("is_unlocked"))
+                is_saved = bool(r.get("is_saved"))
+                raw_email = r.get("raw_email")
+                revealed_email = r.get("revealed_email")
+                display_email = revealed_email or raw_email if is_unlocked else mask_email(raw_email)
+
+                results.append({
+                    "id": pid,
+                    "person_id": pid,
+                    "investor_name": r.get("investor_name") or "Verified Partner",
+                    "partner_name": r.get("investor_name") or "Verified Partner",
+                    "role_title": r.get("role_title") or "Partner",
+                    "firm_name": r.get("firm_name") or "Investment Firm",
+                    "fund_type": r.get("fund_type") or "Venture Capital",
+                    "aum": float(r["aum"]) if r.get("aum") else None,
+                    "location": r.get("location") or "Global",
+                    "stage_focus": r.get("stage_focus") or [],
+                    "sector_focus": r.get("sector_focus") or [],
+                    "linkedin_url": r.get("linkedin_url"),
+                    "is_saved": is_saved,
+                    "is_unlocked": is_unlocked,
+                    "revealed_email": revealed_email if is_unlocked else None,
+                    "partner_email": display_email,
+                    "notes": r.get("notes"),
+                    "activity_at": r["activity_at"].isoformat() if r.get("activity_at") else ""
+                })
+            return results
+    except Exception as e:
+        logger.error(f"Get all leads error: {e}")
+        return []

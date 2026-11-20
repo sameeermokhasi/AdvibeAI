@@ -317,54 +317,62 @@ Return ONLY a valid JSON object matching this schema:
 
 def _find_user_company(user_id: str, company_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Helper to fetch company owned by or accessible to user."""
-    with get_db_cursor(user_id=user_id, commit=False) as cur:
-        if company_id:
-            try:
-                cur.execute(
-                    """SELECT id, user_id, workspace_id, name, stage, sector, geography,
-                              check_size_min, check_size_max, thesis_summary, website_url,
-                              deck_file_url, deck_text, raise_amount, business_model,
-                              traction, moat, use_of_funds, investor_criteria, updated_at
-                       FROM public.companies WHERE id = %s;""",
-                    (company_id,)
-                )
-                res = cur.fetchone()
-                if res:
-                    return dict(res)
-            except Exception:
-                pass
+    try:
+        with get_db_cursor(user_id=user_id, commit=False) as cur:
+            if company_id:
+                try:
+                    cur.execute(
+                        """SELECT id, user_id, workspace_id, name, stage, sector, geography,
+                                  check_size_min, check_size_max, thesis_summary, website_url,
+                                  deck_file_url, deck_text, raise_amount, business_model,
+                                  traction, moat, use_of_funds, investor_criteria, updated_at
+                           FROM public.companies WHERE id = %s;""",
+                        (company_id,)
+                    )
+                    res = cur.fetchone()
+                    if res:
+                        return dict(res)
+                except Exception:
+                    pass
 
-        # Otherwise find user's latest company
-        cur.execute(
-            """SELECT id, user_id, workspace_id, name, stage, sector, geography,
-                      check_size_min, check_size_max, thesis_summary, website_url,
-                      deck_file_url, deck_text, raise_amount, business_model,
-                      traction, moat, use_of_funds, investor_criteria, updated_at
-               FROM public.companies WHERE user_id = %s
-               ORDER BY updated_at DESC LIMIT 1;""",
-            (user_id,)
-        )
-        res = cur.fetchone()
-        return dict(res) if res else None
+            # Otherwise find user's latest company
+            cur.execute(
+                """SELECT id, user_id, workspace_id, name, stage, sector, geography,
+                          check_size_min, check_size_max, thesis_summary, website_url,
+                          deck_file_url, deck_text, raise_amount, business_model,
+                          traction, moat, use_of_funds, investor_criteria, updated_at
+                   FROM public.companies WHERE user_id = %s
+                   ORDER BY updated_at DESC LIMIT 1;""",
+                (user_id,)
+            )
+            res = cur.fetchone()
+            return dict(res) if res else None
+    except Exception as e:
+        logger.warning(f"Database lookup skipped in _find_user_company: {e}")
+        return None
 
 
 def _find_user_workspace_id(user_id: str) -> Optional[str]:
     """Helper to fetch active workspace ID for user."""
-    with get_db_cursor(user_id=user_id, commit=False) as cur:
-        cur.execute(
-            """SELECT workspace_id FROM public.user_subscriptions WHERE user_id = %s AND workspace_id IS NOT NULL LIMIT 1;""",
-            (user_id,)
-        )
-        row = cur.fetchone()
-        if row and row.get("workspace_id"):
-            return str(row["workspace_id"])
+    try:
+        with get_db_cursor(user_id=user_id, commit=False) as cur:
+            cur.execute(
+                """SELECT workspace_id FROM public.user_subscriptions WHERE user_id = %s AND workspace_id IS NOT NULL LIMIT 1;""",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            if row and row.get("workspace_id"):
+                return str(row["workspace_id"])
 
-        cur.execute(
-            """SELECT id FROM public.workspaces WHERE owner_user_id = %s LIMIT 1;""",
-            (user_id,)
-        )
-        row = cur.fetchone()
-        return str(row["id"]) if row else None
+            cur.execute(
+                """SELECT id FROM public.workspaces WHERE owner_user_id = %s LIMIT 1;""",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            return str(row["id"]) if row else None
+    except Exception as e:
+        logger.warning(f"Database lookup skipped in _find_user_workspace_id: {e}")
+        return None
 
 
 @router.get("", summary="Get Raise Readiness for Current Workspace")
@@ -395,15 +403,19 @@ async def get_readiness(
     has_deck = bool(company.get("deck_text") or company.get("deck_file_url"))
 
     # Check for existing persisted evaluation
-    with get_db_cursor(user_id=current_user.id, commit=False) as cur:
-        cur.execute(
-            """SELECT id, overall_score, dimensions, recommendations, summary, created_at
-               FROM public.readiness_evaluations
-               WHERE company_id = %s
-               ORDER BY created_at DESC LIMIT 1;""",
-            (c_id,)
-        )
-        eval_row = cur.fetchone()
+    eval_row = None
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=False) as cur:
+            cur.execute(
+                """SELECT id, overall_score, dimensions, recommendations, summary, created_at
+                   FROM public.readiness_evaluations
+                   WHERE company_id = %s
+                   ORDER BY created_at DESC LIMIT 1;""",
+                (c_id,)
+            )
+            eval_row = cur.fetchone()
+    except Exception as e:
+        logger.warning(f"Failed to fetch persisted readiness evaluation: {e}")
 
     if eval_row:
         dims = eval_row["dimensions"] if isinstance(eval_row["dimensions"], list) else json.loads(eval_row["dimensions"])
@@ -432,26 +444,29 @@ async def get_readiness(
     ws_id = company.get("workspace_id") or _find_user_workspace_id(current_user.id)
     now_dt = datetime.now(timezone.utc)
 
-    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
-        cur.execute(
-            """INSERT INTO public.readiness_evaluations (
-                id, workspace_id, company_id, user_id, overall_score, dimensions, recommendations, summary, created_at, updated_at
-            ) VALUES (
-                %s, %s::uuid, %s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb, %s, %s, %s
-            );""",
-            (
-                str(uuid.uuid4()),
-                ws_id,
-                c_id,
-                current_user.id,
-                eval_result["overall_score"],
-                json.dumps(eval_result["dimensions"]),
-                json.dumps(eval_result["recommendations"]),
-                eval_result["summary"],
-                now_dt,
-                now_dt
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+            cur.execute(
+                """INSERT INTO public.readiness_evaluations (
+                    id, workspace_id, company_id, user_id, overall_score, dimensions, recommendations, summary, created_at, updated_at
+                ) VALUES (
+                    %s, %s::uuid, %s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb, %s, %s, %s
+                );""",
+                (
+                    str(uuid.uuid4()),
+                    ws_id,
+                    c_id,
+                    current_user.id,
+                    eval_result["overall_score"],
+                    json.dumps(eval_result["dimensions"]),
+                    json.dumps(eval_result["recommendations"]),
+                    eval_result["summary"],
+                    now_dt,
+                    now_dt
+                )
             )
-        )
+    except Exception as e:
+        logger.warning(f"Failed to persist readiness evaluation (in-memory mode): {e}")
 
     return {
         "has_data": True,
@@ -490,26 +505,29 @@ async def evaluate_readiness(
     ws_id = req.workspace_id or company.get("workspace_id") or _find_user_workspace_id(current_user.id)
     now_dt = datetime.now(timezone.utc)
 
-    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
-        cur.execute(
-            """INSERT INTO public.readiness_evaluations (
-                id, workspace_id, company_id, user_id, overall_score, dimensions, recommendations, summary, created_at, updated_at
-            ) VALUES (
-                %s, %s::uuid, %s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb, %s, %s, %s
-            );""",
-            (
-                str(uuid.uuid4()),
-                ws_id,
-                c_id,
-                current_user.id,
-                eval_result["overall_score"],
-                json.dumps(eval_result["dimensions"]),
-                json.dumps(eval_result["recommendations"]),
-                eval_result["summary"],
-                now_dt,
-                now_dt
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+            cur.execute(
+                """INSERT INTO public.readiness_evaluations (
+                    id, workspace_id, company_id, user_id, overall_score, dimensions, recommendations, summary, created_at, updated_at
+                ) VALUES (
+                    %s, %s::uuid, %s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb, %s, %s, %s
+                );""",
+                (
+                    str(uuid.uuid4()),
+                    ws_id,
+                    c_id,
+                    current_user.id,
+                    eval_result["overall_score"],
+                    json.dumps(eval_result["dimensions"]),
+                    json.dumps(eval_result["recommendations"]),
+                    eval_result["summary"],
+                    now_dt,
+                    now_dt
+                )
             )
-        )
+    except Exception as e:
+        logger.warning(f"Failed to persist re-evaluated readiness evaluation (in-memory mode): {e}")
 
     return {
         "has_data": True,

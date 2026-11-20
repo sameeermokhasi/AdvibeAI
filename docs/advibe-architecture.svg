@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="archSvg" viewBox="0 0 1680 830" class="w-full min-w-[1150px] h-auto select-none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#8b949e" />
+          </marker>
+          <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#58a6ff" />
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#3fb950" />
+          </marker>
+          <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#bc8cff" />
+          </marker>
+          <marker id="arrow-orange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#f0883e" />
+          </marker>
+        </defs>
+
+        <!-- Background -->
+        <rect width="1680" height="830" fill="#121316" rx="12" />
+
+        <!-- Title -->
+        <text x="840" y="38" text-anchor="middle" fill="#f0f6fc" font-size="22" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
+          Advibe AI — Multi-Stage Investor Discovery &amp; Outreach Architecture
+        </text>
+        <text x="840" y="60" text-anchor="middle" fill="#8b949e" font-size="12.5" font-family="system-ui, -apple-system, sans-serif">
+          Left-to-right request flow: Client SPA → FastAPI Gateway → Dual-Factor AI Pipeline &amp; HITL Gate → PostgreSQL/RLS → Closed-Loop Pulse CRM
+        </text>
+
+        <!-- ==================== LAYER CONTAINERS ==================== -->
+        <!-- Layer 1 -->
+        <rect x="24" y="84" width="256" height="712" rx="10" fill="#181a1f" stroke="#30363d" stroke-width="1.5" />
+        <text x="40" y="108" fill="#c9d1d9" font-size="12" font-weight="700" font-family="system-ui, sans-serif">Layer 1: Client Application</text>
+
+        <!-- Layer 2 -->
+        <rect x="316" y="84" width="264" height="712" rx="10" fill="#181a1f" stroke="#30363d" stroke-width="1.5" />
+        <text x="332" y="108" fill="#c9d1d9" font-size="12" font-weight="700" font-family="system-ui, sans-serif">Layer 2: API &amp; Auth Gateway</text>
+
+        <!-- Layer 3 -->
+        <rect x="616" y="84" width="440" height="712" rx="10" fill="#181a1f" stroke="#30363d" stroke-width="1.5" />
+        <text x="632" y="108" fill="#c9d1d9" font-size="12" font-weight="700" font-family="system-ui, sans-serif">Layer 3: AI &amp; Dual-Factor Matching Pipeline</text>
+
+        <!-- Layer 4 -->
+        <rect x="1092" y="84" width="264" height="712" rx="10" fill="#181a1f" stroke="#30363d" stroke-width="1.5" />
+        <text x="1108" y="108" fill="#c9d1d9" font-size="12" font-weight="700" font-family="system-ui, sans-serif">Layer 4: Persistence &amp; Security</text>
+
+        <!-- Layer 5 -->
+        <rect x="1392" y="84" width="264" height="712" rx="10" fill="#181a1f" stroke="#30363d" stroke-width="1.5" />
+        <text x="1408" y="108" fill="#c9d1d9" font-size="12" font-weight="700" font-family="system-ui, sans-serif">Layer 5: Closed-Loop Pulse CRM</text>
+
+        <!-- ==================== LAYER 1 NODES ==================== -->
+        <g class="node-group" data-id="l1-spa">
+          <rect x="44" y="135" width="216" height="74" rx="6" fill="#16324f" stroke="#388bfd" stroke-width="1.5" />
+          <text x="152" y="166" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">React 18 SPA</text>
+          <text x="152" y="186" text-anchor="middle" fill="#a5d6ff" font-size="11">(Vite + Vanilla CSS + Framer)</text>
+        </g>
+
+        <g class="node-group" data-id="l1-webgl">
+          <rect x="44" y="236" width="216" height="74" rx="6" fill="#16324f" stroke="#388bfd" stroke-width="1.5" />
+          <text x="152" y="267" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">3D / WebGL2 Canvas</text>
+          <text x="152" y="287" text-anchor="middle" fill="#a5d6ff" font-size="11">(WebThreads + 3DMarquee)</text>
+        </g>
+
+        <g class="node-group" data-id="l1-views">
+          <rect x="44" y="337" width="216" height="92" rx="6" fill="#16324f" stroke="#388bfd" stroke-width="1.5" />
+          <text x="152" y="366" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Capital Workspace Views</text>
+          <text x="152" y="386" text-anchor="middle" fill="#a5d6ff" font-size="11">Dashboard · ADDY Copilot</text>
+          <text x="152" y="404" text-anchor="middle" fill="#a5d6ff" font-size="11">Twin Finder · Bulk Resolve</text>
+        </g>
+
+        <g class="node-group" data-id="l1-hitl">
+          <rect x="44" y="456" width="216" height="78" rx="6" fill="#2c1d42" stroke="#a371f7" stroke-width="1.5" />
+          <text x="152" y="488" text-anchor="middle" fill="#f0e6ff" font-size="13" font-weight="600">HITL Review Queue</text>
+          <text x="152" y="508" text-anchor="middle" fill="#d2a8ff" font-size="11">(Draft Edit &amp; Explicit Approval)</text>
+        </g>
+
+        <g class="node-group" data-id="l1-auth">
+          <rect x="44" y="562" width="216" height="74" rx="6" fill="#16324f" stroke="#388bfd" stroke-width="1.5" />
+          <text x="152" y="593" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Supabase Client &amp; API</text>
+          <text x="152" y="613" text-anchor="middle" fill="#a5d6ff" font-size="11">(OAuth2 JWT + api.js)</text>
+        </g>
+
+        <!-- ==================== LAYER 2 NODES ==================== -->
+        <g class="node-group" data-id="l2-fastapi">
+          <rect x="336" y="135" width="224" height="74" rx="6" fill="#132a42" stroke="#388bfd" stroke-width="1.5" />
+          <text x="448" y="166" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">FastAPI / Uvicorn ASGI</text>
+          <text x="448" y="186" text-anchor="middle" fill="#a5d6ff" font-size="11">(main.py + Pydantic v2)</text>
+        </g>
+
+        <g class="node-group" data-id="l2-auth">
+          <rect x="336" y="236" width="224" height="82" rx="6" fill="#2c1d42" stroke="#a371f7" stroke-width="1.5" />
+          <text x="448" y="268" text-anchor="middle" fill="#f0e6ff" font-size="13" font-weight="600">Auth &amp; Security Middleware</text>
+          <text x="448" y="288" text-anchor="middle" fill="#d2a8ff" font-size="11">(Bearer JWT + HMAC-SHA256)</text>
+        </g>
+
+        <g class="node-group" data-id="l2-core-routes">
+          <rect x="336" y="346" width="224" height="96" rx="6" fill="#132a42" stroke="#388bfd" stroke-width="1.5" />
+          <text x="448" y="376" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Core Pipeline Routers</text>
+          <text x="448" y="397" text-anchor="middle" fill="#a5d6ff" font-size="11">/api/v1/intake · /match/{id}</text>
+          <text x="448" y="415" text-anchor="middle" fill="#a5d6ff" font-size="11">/outreach · /campaigns</text>
+        </g>
+
+        <g class="node-group" data-id="l2-ai-routes">
+          <rect x="336" y="468" width="224" height="90" rx="6" fill="#132a42" stroke="#388bfd" stroke-width="1.5" />
+          <text x="448" y="498" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Intelligence Routers</text>
+          <text x="448" y="518" text-anchor="middle" fill="#a5d6ff" font-size="11">/addy · /twin-finder</text>
+          <text x="448" y="536" text-anchor="middle" fill="#a5d6ff" font-size="11">/resolve · /readiness</text>
+        </g>
+
+        <g class="node-group" data-id="l2-webhook">
+          <rect x="336" y="584" width="224" height="74" rx="6" fill="#2c1d42" stroke="#a371f7" stroke-width="1.5" />
+          <text x="448" y="615" text-anchor="middle" fill="#f0e6ff" font-size="13" font-weight="600">Inbound Webhook Route</text>
+          <text x="448" y="635" text-anchor="middle" fill="#d2a8ff" font-size="11">(/api/v1/webhook/reply)</text>
+        </g>
+
+        <!-- ==================== LAYER 3 NODES ==================== -->
+        <!-- LLM Sub-box -->
+        <rect x="636" y="128" width="400" height="106" rx="8" fill="#1d1b18" stroke="#6e4c2a" stroke-width="1.2" />
+        <text x="650" y="146" fill="#f0883e" font-size="11" font-weight="600">Multi-Provider LLM Orchestration (llm_client.py)</text>
+
+        <g class="node-group" data-id="l3-groq">
+          <rect x="650" y="158" width="176" height="60" rx="6" fill="#3a2312" stroke="#f0883e" stroke-width="1.4" />
+          <text x="738" y="184" text-anchor="middle" fill="#ffd8b5" font-size="12.5" font-weight="600">Groq LPU Primary</text>
+          <text x="738" y="202" text-anchor="middle" fill="#f0883e" font-size="10.5">(llama-3.3-70b-versatile)</text>
+        </g>
+
+        <g class="node-group" data-id="l3-openrouter">
+          <rect x="844" y="158" width="176" height="60" rx="6" fill="#3a2312" stroke="#f0883e" stroke-width="1.4" />
+          <text x="932" y="184" text-anchor="middle" fill="#ffd8b5" font-size="12.5" font-weight="600">OpenRouter Fallback</text>
+          <text x="932" y="202" text-anchor="middle" fill="#f0883e" font-size="10.5">(deepseek-r1 / qwen3.8)</text>
+        </g>
+
+        <!-- Stage 1 -->
+        <g class="node-group" data-id="l3-s1">
+          <rect x="640" y="262" width="236" height="68" rx="6" fill="#0f3d2e" stroke="#2ea043" stroke-width="1.5" />
+          <text x="758" y="291" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">1. Intake &amp; Deck Parser</text>
+          <text x="758" y="311" text-anchor="middle" fill="#7ee787" font-size="11">(deck_parser.py → Profile JSON)</text>
+        </g>
+
+        <!-- Stage 2 -->
+        <g class="node-group" data-id="l3-s2">
+          <rect x="640" y="354" width="236" height="72" rx="6" fill="#0f3d2e" stroke="#2ea043" stroke-width="1.5" />
+          <text x="758" y="383" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">2. Rule Prefilter (40%)</text>
+          <text x="758" y="403" text-anchor="middle" fill="#7ee787" font-size="11">(Stage 30 · Sector 35 · Geo 20 · Check 15)</text>
+        </g>
+
+        <!-- Stage 3 -->
+        <g class="node-group" data-id="l3-s3">
+          <rect x="640" y="450" width="236" height="72" rx="6" fill="#0f3d2e" stroke="#2ea043" stroke-width="1.5" />
+          <text x="758" y="479" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">3. LLM Conviction (60%)</text>
+          <text x="758" y="499" text-anchor="middle" fill="#7ee787" font-size="11">(Thesis Alignment 0.0–1.0 + Rationale)</text>
+        </g>
+
+        <!-- Stage 4 -->
+        <g class="node-group" data-id="l3-s4">
+          <rect x="640" y="546" width="236" height="72" rx="6" fill="#0f3d2e" stroke="#2ea043" stroke-width="1.5" />
+          <text x="758" y="575" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">4. Composite Ranker</text>
+          <text x="758" y="595" text-anchor="middle" fill="#7ee787" font-size="11">(0.40×Rule + 0.60×LLM → Partners)</text>
+        </g>
+
+        <!-- Fail-safe Heuristic -->
+        <g class="node-group" data-id="l3-fallback">
+          <rect x="904" y="354" width="132" height="72" rx="6" fill="#2c1d42" stroke="#a371f7" stroke-width="1.5" />
+          <text x="970" y="382" text-anchor="middle" fill="#f0e6ff" font-size="12" font-weight="600">Fail-Safe</text>
+          <text x="970" y="399" text-anchor="middle" fill="#f0e6ff" font-size="12" font-weight="600">Heuristics</text>
+          <text x="970" y="416" text-anchor="middle" fill="#d2a8ff" font-size="10">(429 / Outage)</text>
+        </g>
+
+        <!-- HITL Diamond -->
+        <g class="node-group" data-id="l3-diamond">
+          <polygon points="970,515 1034,565 970,615 906,565" fill="#2c1d42" stroke="#a371f7" stroke-width="1.6" />
+          <text x="970" y="561" text-anchor="middle" fill="#f0e6ff" font-size="11.5" font-weight="600">Human</text>
+          <text x="970" y="577" text-anchor="middle" fill="#f0e6ff" font-size="11.5" font-weight="600">Approved?</text>
+        </g>
+
+        <!-- Stage 5 -->
+        <g class="node-group" data-id="l3-s5">
+          <rect x="640" y="656" width="396" height="72" rx="6" fill="#182b3a" stroke="#3fb950" stroke-width="1.5" />
+          <text x="838" y="685" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">5. Outreach Draft &amp; Resend Gate (outreach_service.py)</text>
+          <text x="838" y="705" text-anchor="middle" fill="#7ee787" font-size="11">status='draft' (Zero Autonomous Send) → Approved → Dispatch</text>
+        </g>
+
+        <!-- ==================== LAYER 4 NODES (CYLINDERS) ==================== -->
+        <!-- Cylinder 1: Postgres -->
+        <g class="node-group" data-id="l4-pg">
+          <path d="M 1118 158 L 1118 238 A 106 16 0 0 0 1330 238 L 1330 158" fill="#3a1e10" stroke="#f0883e" stroke-width="1.5" />
+          <ellipse cx="1224" cy="158" rx="106" ry="16" fill="#4d2815" stroke="#f0883e" stroke-width="1.5" />
+          <text x="1224" y="198" text-anchor="middle" fill="#ffd8b5" font-size="13" font-weight="600">PostgreSQL 15+</text>
+          <text x="1224" y="218" text-anchor="middle" fill="#f0883e" font-size="11">(Supabase / Docker)</text>
+        </g>
+
+        <!-- Box: RLS & GIN -->
+        <g class="node-group" data-id="l4-rls">
+          <rect x="1118" y="282" width="212" height="72" rx="6" fill="#3a1e10" stroke="#f0883e" stroke-width="1.5" />
+          <text x="1224" y="313" text-anchor="middle" fill="#ffd8b5" font-size="13" font-weight="600">RLS &amp; GIN Indexes</text>
+          <text x="1224" y="333" text-anchor="middle" fill="#f0883e" font-size="11">(Tenant Isolation + Array &amp;&amp;)</text>
+        </g>
+
+        <!-- Cylinder 2: Catalog Tables -->
+        <g class="node-group" data-id="l4-catalog">
+          <path d="M 1118 396 L 1118 492 A 106 16 0 0 0 1330 492 L 1330 396" fill="#3a1e10" stroke="#f0883e" stroke-width="1.5" />
+          <ellipse cx="1224" cy="396" rx="106" ry="16" fill="#4d2815" stroke="#f0883e" stroke-width="1.5" />
+          <text x="1224" y="438" text-anchor="middle" fill="#ffd8b5" font-size="13" font-weight="600">Catalog Tables</text>
+          <text x="1224" y="458" text-anchor="middle" fill="#f0883e" font-size="11">investors · people</text>
+          <text x="1224" y="476" text-anchor="middle" fill="#f0883e" font-size="11">fit_scores</text>
+        </g>
+
+        <!-- Cylinder 3: Pipeline Tables -->
+        <g class="node-group" data-id="l4-pipeline">
+          <path d="M 1118 548 L 1118 644 A 106 16 0 0 0 1330 644 L 1330 548" fill="#3a1e10" stroke="#f0883e" stroke-width="1.5" />
+          <ellipse cx="1224" cy="548" rx="106" ry="16" fill="#4d2815" stroke="#f0883e" stroke-width="1.5" />
+          <text x="1224" y="590" text-anchor="middle" fill="#ffd8b5" font-size="13" font-weight="600">Pipeline Tables</text>
+          <text x="1224" y="610" text-anchor="middle" fill="#f0883e" font-size="11">companies · campaigns</text>
+          <text x="1224" y="628" text-anchor="middle" fill="#f0883e" font-size="11">outreach_messages</text>
+        </g>
+
+        <!-- ==================== LAYER 5 NODES ==================== -->
+        <g class="node-group" data-id="l5-resend">
+          <rect x="1414" y="142" width="220" height="74" rx="6" fill="#21262d" stroke="#8b949e" stroke-width="1.5" />
+          <text x="1524" y="173" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Resend Email API</text>
+          <text x="1524" y="193" text-anchor="middle" fill="#8b949e" font-size="11">(Verified Dispatch &amp; Hashes)</text>
+        </g>
+
+        <g class="node-group" data-id="l5-inboxes">
+          <rect x="1414" y="246" width="220" height="74" rx="6" fill="#21262d" stroke="#8b949e" stroke-width="1.5" />
+          <text x="1524" y="277" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Investor Inboxes</text>
+          <text x="1524" y="297" text-anchor="middle" fill="#8b949e" font-size="11">(Partner Replies / SMTP)</text>
+        </g>
+
+        <g class="node-group" data-id="l5-classifier">
+          <rect x="1414" y="352" width="220" height="94" rx="6" fill="#2c1d42" stroke="#a371f7" stroke-width="1.5" />
+          <text x="1524" y="382" text-anchor="middle" fill="#f0e6ff" font-size="13" font-weight="600">NLP Reply Classifier</text>
+          <text x="1524" y="403" text-anchor="middle" fill="#d2a8ff" font-size="10.5">meeting_requested · interested</text>
+          <text x="1524" y="421" text-anchor="middle" fill="#d2a8ff" font-size="10.5">not_interested · wrong_person</text>
+        </g>
+
+        <g class="node-group" data-id="l5-crm">
+          <rect x="1414" y="476" width="220" height="82" rx="6" fill="#0f3d2e" stroke="#2ea043" stroke-width="1.5" />
+          <text x="1524" y="509" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Pulse CRM Sync</text>
+          <text x="1524" y="529" text-anchor="middle" fill="#7ee787" font-size="11">(Live Metrics &amp; Meetings)</text>
+        </g>
+
+        <g class="node-group" data-id="l5-ui">
+          <rect x="1414" y="590" width="220" height="74" rx="6" fill="#1e2246" stroke="#79c0ff" stroke-width="1.5" />
+          <text x="1524" y="621" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Dashboard Re-render</text>
+          <text x="1524" y="641" text-anchor="middle" fill="#a5d6ff" font-size="11">(Closed-Loop Pipeline UI)</text>
+        </g>
+
+        <!-- ==================== ARROWS (LEFT-TO-RIGHT FLOW) ==================== -->
+        <!-- Layer 1 internal -->
+        <path class="flow-arrow" d="M 152 209 L 152 232" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)" />
+        <path class="flow-arrow" d="M 152 310 L 152 333" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)" />
+        <path class="flow-arrow" d="M 152 429 L 152 452" stroke="#a371f7" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" />
+        <path class="flow-arrow" d="M 152 534 L 152 558" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)" />
+
+        <!-- Layer 1 -> Layer 2 -->
+        <path class="flow-arrow" d="M 260 172 L 332 172" stroke="#58a6ff" stroke-width="1.8" fill="none" marker-end="url(#arrow-blue)" />
+        <path class="flow-arrow" d="M 260 599 L 296 599 L 296 277 L 332 277" stroke="#a371f7" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" />
+        <path class="flow-arrow" d="M 260 495 L 308 495 L 308 394 L 332 394" stroke="#a371f7" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" />
+
+        <!-- Layer 2 internal -->
+        <path class="flow-arrow" d="M 448 209 L 448 232" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)" />
+        <path class="flow-arrow" d="M 448 318 L 448 342" stroke="#a371f7" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" />
+        <path class="flow-arrow" d="M 448 442 L 448 464" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)" />
+
+        <!-- Layer 2 -> Layer 3 -->
+        <path class="flow-arrow" d="M 560 394 L 600 394 L 600 296 L 636 296" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+        <path class="flow-arrow" d="M 560 513 L 608 513 L 608 486 L 636 486" stroke="#3fb950" stroke-width="1.6" fill="none" marker-end="url(#arrow-green)" />
+
+        <!-- Layer 3 LLM -> Stages -->
+        <path class="flow-arrow" d="M 738 218 L 738 258" stroke="#f0883e" stroke-width="1.4" fill="none" marker-end="url(#arrow-orange)" />
+        <path class="flow-arrow" d="M 826 188 L 840 188" stroke="#f0883e" stroke-width="1.4" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow-orange)" />
+        <text x="833" y="180" text-anchor="middle" fill="#f0883e" font-size="9.5">429</text>
+
+        <!-- Layer 3 Pipeline vertical -->
+        <path class="flow-arrow" d="M 758 330 L 758 350" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+        <path class="flow-arrow" d="M 758 426 L 758 446" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+        <path class="flow-arrow" d="M 758 522 L 758 542" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+
+        <!-- Stage 3 -> Fallback -->
+        <path class="flow-arrow" d="M 876 486 L 970 486 L 970 430" stroke="#a371f7" stroke-width="1.4" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow-purple)" />
+        <text x="935" y="478" fill="#d2a8ff" font-size="10">LLM Outage</text>
+
+        <!-- Stage 4 -> HITL Diamond -> Stage 5 -->
+        <path class="flow-arrow" d="M 876 582 L 906 565" stroke="#a371f7" stroke-width="1.6" fill="none" marker-end="url(#arrow-purple)" />
+        <path class="flow-arrow" d="M 970 615 L 970 652" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+        <text x="980" y="638" fill="#7ee787" font-size="10.5" font-weight="600">Yes</text>
+
+        <!-- Layer 3 -> Layer 4 (DB reads/writes) -->
+        <path class="flow-arrow" d="M 876 390 L 1072 390 L 1072 446 L 1114 446" stroke="#f0883e" stroke-width="1.6" fill="none" marker-end="url(#arrow-orange)" />
+        <path class="flow-arrow" d="M 876 594 L 1114 594" stroke="#f0883e" stroke-width="1.6" fill="none" marker-end="url(#arrow-orange)" />
+
+        <!-- Layer 4 internal -->
+        <path class="flow-arrow" d="M 1224 254 L 1224 278" stroke="#f0883e" stroke-width="1.5" fill="none" marker-end="url(#arrow-orange)" />
+        <path class="flow-arrow" d="M 1224 354 L 1224 378" stroke="#f0883e" stroke-width="1.5" fill="none" marker-end="url(#arrow-orange)" />
+        <path class="flow-arrow" d="M 1224 508 L 1224 530" stroke="#f0883e" stroke-width="1.5" fill="none" marker-end="url(#arrow-orange)" />
+
+        <!-- Layer 3 Stage 5 -> Layer 5 Resend -->
+        <path class="flow-arrow" d="M 1036 692 L 1372 692 L 1372 179 L 1410 179" stroke="#3fb950" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)" />
+
+        <!-- Layer 5 internal -->
+        <path class="flow-arrow" d="M 1524 216 L 1524 242" stroke="#8b949e" stroke-width="1.6" fill="none" marker-end="url(#arrow-gray)" />
+        <path class="flow-arrow" d="M 1524 320 L 1524 348" stroke="#a371f7" stroke-width="1.6" fill="none" marker-end="url(#arrow-purple)" />
+        <path class="flow-arrow" d="M 1524 446 L 1524 472" stroke="#3fb950" stroke-width="1.6" fill="none" marker-end="url(#arrow-green)" />
+        <path class="flow-arrow" d="M 1524 558 L 1524 586" stroke="#58a6ff" stroke-width="1.6" fill="none" marker-end="url(#arrow-blue)" />
+
+        <!-- Closed-Loop Feedback: Investor Inboxes -> Webhook -> Classifier -> Pipeline DB -->
+        <path class="flow-arrow" d="M 1414 283 L 1380 283 L 1380 755 L 448 755 L 448 662" stroke="#a371f7" stroke-width="1.4" stroke-dasharray="6 4" fill="none" marker-end="url(#arrow-purple)" />
+        <text x="920" y="747" text-anchor="middle" fill="#d2a8ff" font-size="11">Closed-Loop Signed Webhook Callback (/api/v1/webhook/reply)</text>
+
+        <!-- Layer 5 CRM -> Layer 4 Pipeline Tables -->
+        <path class="flow-arrow" d="M 1414 517 L 1364 517 L 1364 594 L 1334 594" stroke="#f0883e" stroke-width="1.5" fill="none" marker-end="url(#arrow-orange)" />
+      </svg>

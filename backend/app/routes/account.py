@@ -45,7 +45,8 @@ async def get_current_user_account(current_user: AuthenticatedUser = Depends(get
                           COALESCE(s.addy_messages_balance, 0) as addy_messages_balance,
                           COALESCE(s.playbook_claims_balance, 1) as playbook_claims_balance,
                           COALESCE(s.discount_claimed, false) as discount_claimed,
-                          COALESCE(w.name, 'General') as workspace_name
+                          COALESCE(w.name, 'General') as workspace_name,
+                          COALESCE((SELECT ABS(SUM(delta)) FROM public.credit_ledger WHERE user_id = u.id AND delta < 0), 0.0) as sparks_used
                    FROM public.users u
                    LEFT JOIN public.user_subscriptions s ON u.id = s.user_id
                    LEFT JOIN public.workspaces w ON u.id = w.owner_user_id
@@ -67,7 +68,8 @@ async def get_current_user_account(current_user: AuthenticatedUser = Depends(get
                     team_seats=1,
                     workspace_name=row.get("workspace_name", "General"),
                     phone=row.get("phone"),
-                    phone_verified_at=row["phone_verified_at"].isoformat() if row.get("phone_verified_at") else None
+                    phone_verified_at=row["phone_verified_at"].isoformat() if row.get("phone_verified_at") else None,
+                    sparks_used=float(row.get("sparks_used", 0.0))
                 )
     except Exception as e:
         logger.warning(f"Error reading user account from DB: {e}")

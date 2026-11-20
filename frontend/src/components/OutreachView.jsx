@@ -58,7 +58,8 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
     setLoading(true);
     setError('');
     try {
-      const companyId = userAccount?.id || '00000000-0000-0000-0000-000000000001';
+      const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const companyId = isUuid(userAccount?.id) ? userAccount.id : '00000000-0000-0000-0000-000000000001';
       const data = await getCampaigns(companyId);
       setCampaigns(data || []);
       if (data && data.length > 0 && !expandedCampaignId) {
@@ -117,6 +118,25 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
       setActionLoading(false);
     }
   };
+
+  if (heyreachConnected === null) {
+    return (
+      <div style={{
+        maxWidth: '680px',
+        margin: '80px auto',
+        textAlign: 'center',
+        padding: '40px',
+        background: 'rgba(20,20,20,0.6)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '12px'
+      }}>
+        <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px', color: '#e2b774' }} />
+        <div style={{ fontSize: '13.5px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
+          Checking HeyReach integration status...
+        </div>
+      </div>
+    );
+  }
 
   if (heyreachConnected === false) {
     return (
@@ -216,7 +236,24 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
             </button>
           </form>
 
-          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.5' }}>
+          <div style={{ marginTop: '16px' }}>
+            <button
+              type="button"
+              onClick={() => setHeyreachConnected('skipped')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: '12px',
+                cursor: 'pointer',
+                textDecoration: 'underline'
+              }}
+            >
+              Skip LinkedIn Integration &amp; View Direct Email Campaigns →
+            </button>
+          </div>
+
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.5' }}>
             🔒 <strong>Enterprise Invariant:</strong> Key is validated against <code>api.heyreach.io/api/public/auth/CheckApiKey</code> and encrypted at rest with Fernet.
           </div>
         </div>
@@ -226,74 +263,116 @@ export default function OutreachView({ userAccount, refreshUserAccount }) {
 
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', width: '100%', padding: '8px 0 40px' }}>
-      {/* HeyReach Connected Banner */}
-      <div style={{
-        marginBottom: '20px',
-        background: 'rgba(74, 222, 128, 0.05)',
-        border: '1px solid rgba(74, 222, 128, 0.2)',
-        borderRadius: '10px',
-        padding: '14px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CheckCircle2 size={18} style={{ color: '#4ade80' }} />
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
-              HeyReach Connected & Synchronized
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.5)' }}>
-              Outreach sequences active on LinkedIn via encrypted credentials
+      {/* HeyReach Integration Status Banner */}
+      {heyreachConnected === true ? (
+        <div style={{
+          marginBottom: '20px',
+          background: 'rgba(74, 222, 128, 0.05)',
+          border: '1px solid rgba(74, 222, 128, 0.2)',
+          borderRadius: '10px',
+          padding: '14px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <CheckCircle2 size={18} style={{ color: '#4ade80' }} />
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
+                HeyReach Connected &amp; Synchronized
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.5)' }}>
+                Outreach sequences active on LinkedIn via encrypted credentials
+              </div>
             </div>
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <a
+              href="https://app.heyreach.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: '#ffffff',
+                color: '#000000',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '7px 14px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Launch HeyReach Web App</span>
+              <ExternalLink size={12} />
+            </a>
+
+            <button
+              onClick={handleDisconnectHeyReach}
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.7)',
+                fontSize: '12px',
+                fontWeight: 500,
+                padding: '7px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <Unlink size={12} />
+              <span>Disconnect</span>
+            </button>
+          </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <a
-            href="https://app.heyreach.io"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              background: '#ffffff',
-              color: '#000000',
-              fontSize: '12px',
-              fontWeight: 600,
-              padding: '7px 14px',
-              borderRadius: '6px',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <span>Launch HeyReach Web App</span>
-            <ExternalLink size={12} />
-          </a>
-
+      ) : (
+        <div style={{
+          marginBottom: '20px',
+          background: 'rgba(226, 183, 116, 0.05)',
+          border: '1px solid rgba(226, 183, 116, 0.2)',
+          borderRadius: '10px',
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Key size={16} style={{ color: '#e2b774' }} />
+            <div>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#ffffff' }}>
+                HeyReach Not Connected (LinkedIn Sequences Inactive)
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
+                Direct email outreach active. Connect HeyReach anytime to sync LinkedIn sequences.
+              </div>
+            </div>
+          </div>
           <button
-            onClick={handleDisconnectHeyReach}
+            onClick={() => setHeyreachConnected(false)}
             style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '7px 12px',
+              background: '#e2b774',
+              color: '#000000',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              padding: '6px 14px',
               borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px'
+              border: 'none',
+              cursor: 'pointer'
             }}
           >
-            <Unlink size={12} />
-            <span>Disconnect</span>
+            Connect HeyReach
           </button>
         </div>
-      </div>
+      )}
 
       <div style={{
         background: 'rgba(20,20,20,0.65)',

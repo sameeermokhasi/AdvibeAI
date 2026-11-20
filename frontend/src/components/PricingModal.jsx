@@ -44,7 +44,16 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
   const [utrNumber, setUtrNumber] = useState('');
   const [utrSubmitting, setUtrSubmitting] = useState(false);
   const [utrStatus, setUtrStatus] = useState(null);
+  const [utrError, setUtrError] = useState('');
+  const [activeUtr, setActiveUtr] = useState('');
+  const [isAwaitingVerification, setIsAwaitingVerification] = useState(false);
   const [manualQrEnabled, setManualQrEnabled] = useState(true);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 4000);
+  };
 
   // Razorpay standard checkout state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -73,6 +82,9 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
     setPaymentSuccessData(null);
     setUtrStatus(null);
     setUtrNumber('');
+    setUtrError('');
+    setActiveUtr('');
+    setIsAwaitingVerification(false);
     onClose();
   };
 
@@ -92,16 +104,20 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
     return () => clearInterval(timer);
   }, [qrData, isQrExpired, paymentSuccessData]);
 
-  // Polling payment status every 3 seconds
+  // Polling payment status every 3 seconds for QR or manual UTR
   useEffect(() => {
-    if (!qrData?.qr_id || isQrExpired || paymentSuccessData) return;
+    const pollId = activeUtr || qrData?.qr_id;
+    if (!pollId || paymentSuccessData) return;
     const pollInterval = setInterval(async () => {
       try {
-        const res = await getQrPaymentStatus(qrData.qr_id);
-        if (res?.paid) {
+        const res = await getQrPaymentStatus(pollId);
+        if (res?.paid || res?.status === 'paid') {
           clearInterval(pollInterval);
+          setIsAwaitingVerification(false);
+          const sparksAdded = res.sparks_credited != null ? res.sparks_credited : (selectedItem?.itemId === 'demo_1' ? 2 : 2);
+          showToast(`+${sparksAdded} Sparks added`);
           setPaymentSuccessData({
-            message: `Payment received! ${res.sparks_credited || qrData.sparks || ''} Sparks added to your account`,
+            message: `Payment confirmed! +${sparksAdded} Sparks added to your account`,
             new_balance: res.new_sparks_balance
           });
           if (refreshUserAccount) {
@@ -113,7 +129,7 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
       }
     }, 3000);
     return () => clearInterval(pollInterval);
-  }, [qrData?.qr_id, isQrExpired, paymentSuccessData, refreshUserAccount]);
+  }, [activeUtr, qrData?.qr_id, paymentSuccessData, refreshUserAccount, selectedItem]);
 
   const formatCountdown = (secs) => {
     const m = Math.floor(secs / 60);
@@ -251,33 +267,58 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
     }
   };
 
-  // Submit 12-digit UTR for PhonePe direct
-  const handleSubmitUtr = async (e) => {
-    e.preventDefault();
+  // Open Demo Pack Checkout
+  const handleOpenDemoPack = () => {
+    const item = {
+      itemType: 'sparks_pack',
+      itemId: 'demo_1',
+      name: '₹1 -> 2 Sparks (Demo)',
+      price: 1,
+      sparks: '2 Sparks'
+    };
+    setSelectedItem(item);
+    setPaymentMethod('qr');
+    setUtrStatus(null);
+    setUtrNumber('');
+    setUtrError('');
+    setIsAwaitingVerification(false);
+    setActiveUtr('');
+    setPaymentSuccessData(null);
+  };
+
+  // Submit 12-digit UTR ("I've paid" action)
+  const handleIvePaid = async (e) => {
+    if (e) e.preventDefault();
+    setUtrError('');
     const clean = utrNumber.trim();
-    if (clean.length !== 12) {
-      setUtrStatus({ success: false, message: 'UTR / Transaction ID must be exactly 12 alphanumeric characters.' });
+    if (clean.length !== 12 || !/^\d{12}$/.test(clean)) {
+      setUtrError('Please enter a valid 12-digit numeric UTR (e.g. 529182746193).');
       return;
     }
     setUtrSubmitting(true);
     setUtrStatus(null);
     try {
-      const res = await submitManualPayment(clean, selectedItem.itemId);
+      const res = await submitManualPayment(
+        clean,
+        selectedItem?.itemId || 'demo_1',
+        selectedItem?.itemType || 'sparks_pack'
+      );
       if (res?.success) {
+        setActiveUtr(clean);
+        setIsAwaitingVerification(true);
         setUtrStatus({
           success: true,
-          message: 'UTR submitted for review! Sparks will be credited immediately upon confirmation.'
+          message: 'UTR submitted for review. Awaiting verification...'
         });
       }
     } catch (err) {
-      setUtrStatus({
-        success: false,
-        message: err.message || 'Failed to submit UTR. Please verify the 12-digit reference.'
-      });
+      setUtrError(err.message || 'Failed to submit UTR. Please verify the 12-digit reference.');
     } finally {
       setUtrSubmitting(false);
     }
   };
+
+  const handleSubmitUtr = handleIvePaid;
 
   // Instant Sparks Top-Up
   const handleTopUp = async (amount) => {
@@ -646,157 +687,163 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
                   )}
                 </div>
 
-                {/* --- TAB 1: DYNAMIC UPI QR CODE --- */}
+                {/* --- TAB 1: UPI QR CODE --- */}
                 {paymentMethod === 'qr' && (
                   <div>
-                    {qrLoading ? (
-                      <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255, 255, 255, 0.6)' }}>
-                        <RefreshCw size={28} className="spin" style={{ margin: '0 auto 12px' }} />
-                        <p style={{ fontSize: '13px' }}>Generating dynamic UPI QR code with server-verified amount...</p>
-                      </div>
-                    ) : isQrExpired ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'center' }}>
+                      {/* Fixed QR Image Box */}
                       <div style={{
-                        textAlign: 'center',
-                        padding: '40px 24px',
-                        background: 'rgba(239, 68, 68, 0.05)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        borderRadius: '12px'
+                        background: '#ffffff',
+                        padding: '20px',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
                       }}>
-                        <Clock size={36} style={{ color: '#f87171', margin: '0 auto 12px' }} />
-                        <h4 style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
-                          QR Code Expired
-                        </h4>
-                        <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '20px' }}>
-                          For security and price protection, dynamic QR codes expire after 15 minutes.
-                        </p>
-                        <button
-                          onClick={() => handleGenerateQr(selectedItem)}
+                        <img
+                          src="/phonepe-qr.jpeg"
+                          alt="Scan UPI QR Code to pay"
                           style={{
-                            background: '#e2b774',
-                            color: '#000000',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '10px 22px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
+                            width: '240px',
+                            height: '240px',
+                            objectFit: 'contain',
+                            display: 'block'
                           }}
-                        >
-                          Generate new QR code
-                        </button>
-                      </div>
-                    ) : qrData ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'center' }}>
-                        {/* QR Image Box */}
-                        <div style={{
-                          background: '#ffffff',
-                          padding: '20px',
-                          borderRadius: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
-                        }}>
-                          <img
-                            src={qrData.image_url}
-                            alt="Scan UPI QR Code to pay"
-                            style={{
-                              width: '240px',
-                              height: '240px',
-                              objectFit: 'contain',
-                              display: 'block'
-                            }}
-                          />
-                          <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                            <span style={{ fontSize: '11px', color: '#666666', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                              Advibe AI · UPI Single-Use QR
-                            </span>
-                            <div style={{ fontSize: '18px', fontWeight: 800, color: '#000000', marginTop: '2px' }}>
-                              ₹{qrData.amount_inr.toLocaleString('en-IN')}
-                            </div>
+                        />
+                        <div style={{ marginTop: '14px', textAlign: 'center', width: '100%' }}>
+                          <div style={{ fontSize: '18px', fontWeight: 800, color: '#000000' }}>
+                            Payable Amount: ₹{selectedItem.price.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#555555', marginTop: '4px' }}>
+                            Selected Pack: {selectedItem.name}
                           </div>
                         </div>
+                      </div>
 
-                        {/* QR Instructions & Countdown */}
-                        <div>
-                          {/* Countdown badge */}
+                      {/* Payment Instructions & UTR Confirmation */}
+                      <div>
+                        <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', marginBottom: '6px' }}>
+                          Scan &amp; Pay via UPI
+                        </h4>
+                        <p style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '16px', lineHeight: 1.45 }}>
+                          Scan with PhonePe, Google Pay, Paytm, BHIM, CRED or any bank UPI app.
+                        </p>
+
+                        {/* Status Messages */}
+                        {isAwaitingVerification && (
                           <div style={{
-                            display: 'inline-flex',
+                            display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: 'rgba(226, 183, 116, 0.1)',
-                            border: '1px solid rgba(226, 183, 116, 0.3)',
+                            background: 'rgba(226, 183, 116, 0.12)',
+                            border: '1px solid rgba(226, 183, 116, 0.35)',
                             borderRadius: '8px',
-                            padding: '6px 14px',
-                            marginBottom: '16px',
-                            color: '#e2b774'
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            color: '#e2b774',
+                            fontSize: '12.5px',
+                            fontWeight: 600
                           }}>
-                            <Clock size={15} />
-                            <span style={{ fontSize: '13px', fontWeight: 700 }}>
-                              Expires in {formatCountdown(timeLeft)}
-                            </span>
+                            <RefreshCw size={14} className="spin" />
+                            <span>Awaiting verification... checking automatically</span>
                           </div>
+                        )}
 
-                          <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', marginBottom: '6px' }}>
-                            Scan with any UPI app
-                          </h4>
-                          <p style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.55)', marginBottom: '16px', lineHeight: 1.45 }}>
-                            Google Pay, PhonePe, Paytm, BHIM, CRED, Navi or any bank app.
-                          </p>
-
-                          {/* Instructions Box */}
+                        {utrError && (
                           <div style={{
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            borderRadius: '10px',
-                            padding: '14px 16px',
-                            fontSize: '12px',
-                            color: 'rgba(255, 255, 255, 0.75)',
-                            lineHeight: 1.6,
-                            marginBottom: '16px'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            color: '#f87171',
+                            fontSize: '12.5px'
                           }}>
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                              <span style={{ color: '#e2b774', fontWeight: 700 }}>1.</span>
-                              <span>Open your camera or preferred UPI scanner.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                              <span style={{ color: '#e2b774', fontWeight: 700 }}>2.</span>
-                              <span>Verify recipient as <strong>Advibe AI</strong> and exact amount ₹{qrData.amount_inr}.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <span style={{ color: '#e2b774', fontWeight: 700 }}>3.</span>
-                              <span>Approve payment. This screen will auto-refresh immediately.</span>
-                            </div>
+                            <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                            <span>{utrError}</span>
                           </div>
+                        )}
 
-                          {/* Live Status indicator */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.45)' }}>
-                            <RefreshCw size={13} className="spin" style={{ color: '#e2b774' }} />
-                            <span>Listening for payment confirmation (polls every 3s)...</span>
-                          </div>
+                        {/* 12-Digit UTR Input Form */}
+                        <form onSubmit={handleIvePaid} style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '10px',
+                          padding: '16px',
+                          marginBottom: '14px'
+                        }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.8)', marginBottom: '8px' }}>
+                            12-Digit UTR / Transaction Ref No.
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={12}
+                            value={utrNumber}
+                            onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="e.g. 529182746193"
+                            disabled={isAwaitingVerification}
+                            style={{
+                              width: '100%',
+                              height: '42px',
+                              background: '#1a1a24',
+                              border: '1px solid rgba(255, 255, 255, 0.14)',
+                              borderRadius: '8px',
+                              color: '#ffffff',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                              letterSpacing: '0.08em',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                              marginBottom: '12px'
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            disabled={utrSubmitting || isAwaitingVerification || utrNumber.trim().length !== 12}
+                            style={{
+                              width: '100%',
+                              height: '42px',
+                              background: (utrSubmitting || isAwaitingVerification || utrNumber.trim().length !== 12) ? 'rgba(255, 255, 255, 0.08)' : '#e2b774',
+                              color: (utrSubmitting || isAwaitingVerification || utrNumber.trim().length !== 12) ? 'rgba(255, 255, 255, 0.3)' : '#000000',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              cursor: (utrSubmitting || isAwaitingVerification || utrNumber.trim().length !== 12) ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {isAwaitingVerification ? (
+                              <>
+                                <RefreshCw size={14} className="spin" />
+                                <span>Awaiting verification</span>
+                              </>
+                            ) : utrSubmitting ? (
+                              <>
+                                <RefreshCw size={14} className="spin" />
+                                <span>Submitting...</span>
+                              </>
+                            ) : (
+                              <span>I've paid</span>
+                            )}
+                          </button>
+                        </form>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                          <ShieldCheck size={14} style={{ color: '#4ade80' }} />
+                          <span>Sparks will be credited immediately upon confirmation.</span>
                         </div>
                       </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '30px' }}>
-                        <p style={{ color: '#f87171' }}>{qrError || 'Failed to initialize QR code.'}</p>
-                        <button
-                          onClick={() => handleGenerateQr(selectedItem)}
-                          style={{
-                            marginTop: '12px',
-                            background: '#e2b774',
-                            color: '#000000',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '8px 16px',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -867,8 +914,13 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
                           margin: '0 auto'
                         }}
                       />
-                      <div style={{ marginTop: '10px', fontSize: '13px', color: '#e1bee7', fontWeight: 600 }}>
-                        Scan with PhonePe or any UPI App
+                      <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                          Payable Amount: ₹{selectedItem.price.toLocaleString('en-IN')}
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#e1bee7', marginTop: '4px' }}>
+                          Selected Pack: {selectedItem.name}
+                        </div>
                       </div>
                     </div>
 
@@ -1185,6 +1237,27 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenDemoPack}
+                  style={{
+                    background: 'rgba(226, 183, 116, 0.15)',
+                    border: '1px solid #e2b774',
+                    color: '#e2b774',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <Zap size={12} style={{ color: '#e2b774' }} />
+                  <span>₹1 -&gt; 2 Sparks (Demo)</span>
+                </button>
                 {[10, 50, 100].map((amt) => (
                   <button
                     key={amt}
@@ -1256,6 +1329,27 @@ export default function PricingModal({ isOpen, onClose, userAccount, refreshUser
           </div>
         )}
       </div>
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          zIndex: 9999,
+          background: '#10b981',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          fontWeight: 700
+        }}>
+          <CheckCircle2 size={18} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }

@@ -18,9 +18,16 @@ export default function ExclusionsView() {
     setError('');
     try {
       const data = await getExclusions();
-      setItems(data || []);
+      if (Array.isArray(data)) {
+        setItems(data);
+      } else if (data && Array.isArray(data.items)) {
+        setItems(data.items);
+      } else {
+        setItems([]);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to load exclusions');
+      console.warn('Failed to load exclusions:', err);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -256,28 +263,36 @@ export default function ExclusionsView() {
           </form>
         )}
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
-            Loading exclusions...
-          </div>
-        ) : items.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px 20px',
-            background: 'rgba(255,255,255,0.02)',
-            borderRadius: '8px',
-            border: '1px dashed rgba(255,255,255,0.08)'
-          }}>
-            <Ban size={32} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>No Exclusions Set</h4>
-            <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.5)', marginTop: '4px', maxWidth: '380px', margin: '4px auto 0' }}>
-              Add investor firms, competitive funds, or individual partners here to suppress them from discovery and campaigns.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {items.map((item) => (
-              <div
+        {(() => {
+          const safeItems = Array.isArray(items) ? items : (Array.isArray(items?.items) ? items.items : []);
+          if (loading) {
+            return (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+                Loading exclusions...
+              </div>
+            );
+          }
+          if (safeItems.length === 0) {
+            return (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: '8px',
+                border: '1px dashed rgba(255,255,255,0.08)'
+              }}>
+                <Ban size={32} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 10px' }} />
+                <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>No Exclusions Set</h4>
+                <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.5)', marginTop: '4px', maxWidth: '380px', margin: '4px auto 0' }}>
+                  Add investor firms, competitive funds, or individual partners here to suppress them from discovery and campaigns.
+                </p>
+              </div>
+            );
+          }
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {safeItems.map((item) => (
+                <div
                 key={item.id}
                 style={{
                   display: 'flex',
@@ -328,7 +343,8 @@ export default function ExclusionsView() {
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

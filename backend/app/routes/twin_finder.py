@@ -51,12 +51,15 @@ async def find_comparable_companies(req: TwinFinderCompsRequest, current_user: A
         )
     ]
 
-    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
-        for c in comps:
-            cur.execute('''
-                INSERT INTO comparable_companies (id, name, stage, sector, description, funding_amount, lead_investors)
-                VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING
-            ''', (c.id, c.name, c.stage, c.sector, c.description, c.funding_amount, c.lead_investors))
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+            for c in comps:
+                cur.execute('''
+                    INSERT INTO comparable_companies (id, name, stage, sector, description, funding_amount, lead_investors)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING
+                ''', (c.id, c.name, c.stage, c.sector, c.description, c.funding_amount, c.lead_investors))
+    except Exception as db_err:
+        logger.warning(f"Database persistence skipped in find_comparable_companies (in-memory mode): {db_err}")
 
     return TwinFinderCompsResponse(brief=brief, comparables_count=len(comps), comparables=comps)
 
@@ -91,29 +94,34 @@ async def get_comparable_firms(req: TwinFinderCompsRequest, current_user: Authen
     top_matches = scored[:10] if scored else []
 
     firms: List[LookalikeFirm] = []
-    with get_db_cursor(user_id=current_user.id, commit=True) as cur:
-        for inv, score in top_matches:
-            cmin = inv.get("typical_check_min")
-            cmax = inv.get("typical_check_max")
-            check_size = f"${int(cmin/1_000_000)}M - ${int(cmax/1_000_000)}M" if cmin and cmax else "$500K - $3M"
-            st_disp = inv.get("stage_focus", ["Seed"])[0] if inv.get("stage_focus") else "Seed"
-            sec_disp = inv.get("sector_focus", ["B2B SaaS"])[0] if inv.get("sector_focus") else "Tech"
-            why = f"Active check writer in {sec_disp} at {st_disp} stage."
+    for inv, score in top_matches:
+        cmin = inv.get("typical_check_min")
+        cmax = inv.get("typical_check_max")
+        check_size = f"${int(cmin/1_000_000)}M - ${int(cmax/1_000_000)}M" if cmin and cmax else "$500K - $3M"
+        st_disp = inv.get("stage_focus", ["Seed"])[0] if inv.get("stage_focus") else "Seed"
+        sec_disp = inv.get("sector_focus", ["B2B SaaS"])[0] if inv.get("sector_focus") else "Tech"
+        why = f"Active check writer in {sec_disp} at {st_disp} stage."
 
-            lf = LookalikeFirm(
-                firm_name=inv.get("firm_name"),
-                why_it_fits=why,
-                funded_stage=st_disp,
-                active=True,
-                score=score,
-                check_size=check_size,
-                partners_count=len(inv.get("people", [])) or 2
-            )
-            firms.append(lf)
-            cur.execute('''
-                INSERT INTO lookalike_firm_matches (id, user_id, firm_name, why_it_fits, funded_stage, active, score, check_size, partners_count)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (str(uuid.uuid4()), current_user.id, lf.firm_name, lf.why_it_fits, lf.funded_stage, lf.active, lf.score, lf.check_size, lf.partners_count))
+        lf = LookalikeFirm(
+            firm_name=inv.get("firm_name"),
+            why_it_fits=why,
+            funded_stage=st_disp,
+            active=True,
+            score=score,
+            check_size=check_size,
+            partners_count=len(inv.get("people", [])) or 2
+        )
+        firms.append(lf)
+
+    try:
+        with get_db_cursor(user_id=current_user.id, commit=True) as cur:
+            for lf in firms:
+                cur.execute('''
+                    INSERT INTO lookalike_firm_matches (id, user_id, firm_name, why_it_fits, funded_stage, active, score, check_size, partners_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (str(uuid.uuid4()), current_user.id, lf.firm_name, lf.why_it_fits, lf.funded_stage, lf.active, lf.score, lf.check_size, lf.partners_count))
+    except Exception as db_err:
+        logger.warning(f"Database persistence skipped in get_comparable_firms (in-memory mode): {db_err}")
 
     return TwinFinderFirmsResponse(brief=req.brief, firms_count=len(firms), firms=firms)
 

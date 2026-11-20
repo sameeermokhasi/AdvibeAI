@@ -274,6 +274,10 @@ class AddyChatResponse(BaseModel):
     sparks_spent: float = 0.0
     remaining_sparks: float = 10.0
     remaining_addy_messages: int = 25
+    provider_used: Optional[str] = None
+    attachments: Optional[Dict[str, Any]] = None
+    conversation_id: Optional[str] = None
+    error_details: Optional[Dict[str, Any]] = None
 
 class SearchPreviewRequest(BaseModel):
     query: str
@@ -391,6 +395,7 @@ class UserAccountOut(BaseModel):
     workspace_name: str = "General"
     phone: Optional[str] = None
     phone_verified_at: Optional[str] = None
+    sparks_used: float = 0.0
 
 class ClaimDiscountRequest(BaseModel):
     plan_tier: str = "solo"

@@ -52,18 +52,16 @@ def get_model_for_provider(provider: str) -> str:
     return "qwen/qwen3.8-27b"
 
 
-def chat_completion_with_fallback(
+def chat_completion_with_meta(
     messages: List[Dict[str, str]],
     response_format: Optional[Dict[str, Any]] = None,
     max_tokens: int = 1500,
     temperature: float = 0.2
-) -> str:
+) -> tuple[str, str]:
     """
     Executes a chat completion across providers in LLM_PROVIDER_ORDER with retry
     and exponential backoff (max 2 attempts per provider, base delay 500ms).
-
-    Tries providers in sequence (Groq -> OpenRouter) and returns the first success.
-    Logs warnings upon individual provider failures before falling through.
+    Returns (content, provider_name).
     """
     providers = settings.LLM_PROVIDER_ORDER or ["groq", "openrouter"]
     last_exception = None
@@ -107,7 +105,7 @@ def chat_completion_with_fallback(
                 response = client.chat.completions.create(**kwargs)
                 if response.choices and len(response.choices) > 0:
                     content = response.choices[0].message.content or ""
-                    return content.strip()
+                    return content.strip(), provider_name
                 raise APIError("Empty response returned from provider choices.", request=None, body=None)
 
             except (RateLimitError, APIConnectionError, APITimeoutError) as retryable_err:
@@ -129,3 +127,18 @@ def chat_completion_with_fallback(
 
     # If all configured providers have failed
     raise RuntimeError(f"All LLM providers failed in LLM_PROVIDER_ORDER ({providers}). Last error: {last_exception}")
+
+
+def chat_completion_with_fallback(
+    messages: List[Dict[str, str]],
+    response_format: Optional[Dict[str, Any]] = None,
+    max_tokens: int = 1500,
+    temperature: float = 0.2
+) -> str:
+    content, _ = chat_completion_with_meta(
+        messages=messages,
+        response_format=response_format,
+        max_tokens=max_tokens,
+        temperature=temperature
+    )
+    return content

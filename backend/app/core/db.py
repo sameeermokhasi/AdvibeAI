@@ -6,8 +6,11 @@ and health checking against PostgreSQL 15 (Docker Compose / Supabase).
 """
 
 import os
+import time
 import json
+import socket
 import logging
+from urllib.parse import urlparse
 from typing import List, Dict, Any, Optional
 from contextlib import contextmanager
 from app.core.config import settings
@@ -23,27 +26,60 @@ except ImportError:
     logger.warning("psycopg2 not installed. Database operations will use fallback or in-memory state.")
 
 _connection_pool: Optional[Any] = None
+_last_pool_attempt: float = 0.0
+_POOL_RETRY_INTERVAL: float = 30.0
+
+
+def _is_db_socket_reachable(db_url: str) -> bool:
+    try:
+        p = urlparse(db_url)
+        host = p.hostname or "127.0.0.1"
+        if host == "localhost":
+            host = "127.0.0.1"
+        port = p.port or 5432
+        with socket.create_connection((host, port), timeout=0.2):
+            return True
+    except Exception:
+        return False
 
 
 def get_connection_pool():
-    global _connection_pool
+    global _connection_pool, _last_pool_attempt
     if not _has_psycopg2:
         return None
 
-    if _connection_pool is None:
-        try:
-            db_url = settings.DATABASE_URL
-            _connection_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=20,
-                dsn=db_url
-            )
-            logger.info("PostgreSQL connection pool initialized successfully.")
-        except Exception as e:
-            logger.warning(f"Could not connect to PostgreSQL at {settings.DATABASE_URL}: {e}")
-            _connection_pool = None
+    if _connection_pool is not None:
+        return _connection_pool
+
+    now = time.time()
+    if now - _last_pool_attempt < _POOL_RETRY_INTERVAL:
+        return None
+
+    _last_pool_attempt = now
+    db_url = settings.DATABASE_URL or ""
+
+    # Instant socket probe before calling blocking psycopg2
+    if not _is_db_socket_reachable(db_url):
+        return None
+
+    try:
+        _connection_pool = psycopg2.pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=20,
+            dsn=db_url
+        )
+        logger.info("PostgreSQL connection pool initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Could not connect to PostgreSQL at {settings.DATABASE_URL}: {e}")
+        _connection_pool = None
 
     return _connection_pool
+
+
+def is_db_available() -> bool:
+    """Returns True if active PostgreSQL connection pool is ready."""
+    global _connection_pool
+    return _connection_pool is not None
 
 
 @contextmanager

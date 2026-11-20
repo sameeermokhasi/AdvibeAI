@@ -12,7 +12,7 @@ from typing import Optional, Set
 from cryptography.fernet import Fernet
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.db import get_db_cursor
+from app.core.db import get_db_cursor, is_db_available
 
 def _get_fernet() -> Fernet:
     """Derives or formats a 32-byte url-safe base64 key for Fernet."""
@@ -69,7 +69,7 @@ def mask_email(email: Optional[str]) -> str:
 
 def get_unlocked_person_ids(user_id: Optional[str]) -> Set[str]:
     """Retrieves the set of person_ids unlocked by the specified user."""
-    if not user_id:
+    if not user_id or not is_db_available():
         return set()
     try:
         with get_db_cursor(user_id=user_id, commit=False) as cur:

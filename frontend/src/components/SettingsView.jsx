@@ -207,8 +207,12 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  const sparksUsed = 10.0 - (userAccount?.sparks_balance ?? 10.0);
-  const sparksTotal = userAccount?.sparks_monthly_quota ?? 10.0;
+  const sparksUsed = Number(
+    userAccount?.sparks_used != null
+      ? userAccount.sparks_used
+      : Math.max(0, 10.0 - (Number(userAccount?.sparks_balance) || 10.0))
+  ) || 0;
+  const sparksTotal = Number(userAccount?.sparks_monthly_quota) || 10.0;
 
   const scrollToSection = (id) => {
     const el = document.getElementById(id);
@@ -925,8 +929,8 @@ export default function SettingsView({ userAccount, openPricingModal, refreshUse
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, color: '#ffffff', textTransform: 'capitalize' }}>
-                          {item.item_type.replace('_', ' ')} · {item.item_id}
+                        <div style={{ fontWeight: 600, color: '#ffffff' }}>
+                          {item.item_id === 'demo_1' ? '₹1 -> +2 Sparks' : (item.display_title || `${item.item_type?.replace('_', ' ')} · ${item.item_id}`)}
                         </div>
                         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
                           Order: {item.order_id} {item.payment_id ? `· Pay: ${item.payment_id}` : ''}

@@ -19,7 +19,9 @@ import {
   Globe,
   SlidersHorizontal,
   Target,
-  Gauge
+  Gauge,
+  ShieldCheck,
+  LayoutDashboard
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -36,13 +38,18 @@ export default function Sidebar({
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const sparksUsed = 10.0 - (userAccount?.sparks_balance ?? 10.0);
-  const sparksTotal = userAccount?.sparks_monthly_quota ?? 10.0;
+  const sparksUsed = Number(
+    userAccount?.sparks_used != null
+      ? userAccount.sparks_used
+      : Math.max(0, 10.0 - (Number(userAccount?.sparks_balance) || 10.0))
+  ) || 0;
+  const sparksTotal = Number(userAccount?.sparks_monthly_quota) || 10.0;
 
   const navSections = [
     {
       title: 'WORKSPACE',
       items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'addy', label: 'Agent (Chat)', icon: Sparkles },
         { id: 'discovery', label: 'Discover', icon: Globe },
         { id: 'twin-finder', label: 'Lookalike investors', icon: Crosshair },
@@ -64,7 +71,8 @@ export default function Sidebar({
         { id: 'all-leads', label: 'All leads', icon: Users },
         { id: 'watchlist', label: 'Saved leads', icon: Bookmark },
         { id: 'exclusions', label: 'Exclusions', icon: Ban },
-        { id: 'settings', label: 'Settings', icon: SlidersHorizontal }
+        { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
+        { id: 'admin-payments', label: 'Admin Payments', icon: ShieldCheck }
       ]
     }
   ];

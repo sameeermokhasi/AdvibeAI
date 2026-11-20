@@ -23,7 +23,7 @@ from app.services.scheduled_worker import start_scheduled_worker, stop_scheduled
 from app.routes import (
     intake, match, outreach, webhook, campaigns, investors, tracks,
     addy, twin_finder, resolve, account, auth_routes, watchlist_routes,
-    exclusions, command_center, readiness, scheduled_jobs, billing
+    exclusions, command_center, readiness, scheduled_jobs, billing, decks
 )
 
 @asynccontextmanager
@@ -47,6 +47,8 @@ app = FastAPI(
 CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:8000",
@@ -223,11 +225,13 @@ app.include_router(resolve.router)
 app.include_router(account.router)
 app.include_router(auth_routes.router)
 app.include_router(watchlist_routes.router)
+app.include_router(watchlist_routes.leads_router)
 app.include_router(exclusions.router)
 app.include_router(command_center.router)
 app.include_router(readiness.router)
 app.include_router(scheduled_jobs.router)
 app.include_router(billing.router)
+app.include_router(decks.router)
 
 
 

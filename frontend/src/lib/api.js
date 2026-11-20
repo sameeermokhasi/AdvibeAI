@@ -5,7 +5,7 @@
  * FastAPI backend and PostgreSQL database.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export class ApiError extends Error {
   constructor(message, status, data = null) {
@@ -198,6 +198,54 @@ export async function getAddyChatHistory() {
   return request('/api/v1/addy/history', { method: 'GET' });
 }
 
+export async function getAddyConversations() {
+  return request('/api/v1/addy/conversations', { method: 'GET' });
+}
+
+export async function createAddyConversation() {
+  return request('/api/v1/addy/conversations', { method: 'POST' });
+}
+
+export async function getAddyLatestConversation() {
+  return request('/api/v1/addy/conversations/latest', { method: 'GET' });
+}
+
+export async function getAddyConversation(conversationId) {
+  return request(`/api/v1/addy/conversations/${conversationId}`, { method: 'GET' });
+}
+
+export async function updateAddyProfile(conversationId, profileData) {
+  return request(`/api/v1/addy/conversations/${conversationId}/profile`, {
+    method: 'PUT',
+    body: JSON.stringify(profileData)
+  });
+}
+
+export async function triggerAddyFindMatches(conversationId) {
+  return request(`/api/v1/addy/conversations/${conversationId}/find-matches`, {
+    method: 'POST'
+  });
+}
+
+export async function uploadPitchDeck(formData) {
+  const url = `${API_BASE_URL}/api/v1/decks`;
+  const token = localStorage.getItem('advibe_token') || 'dev-mock-token';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: formData
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const errorMsg = data?.message || data?.detail || `Upload failed with status ${response.status}`;
+    throw new ApiError(errorMsg, response.status, data);
+  }
+  return data;
+}
+
 // 3. Twin Finder (Lookalike Investor Discovery)
 export async function getTwinFinderComps(brief, track = 'venture') {
   return request('/api/v1/twin-finder/comparables', {
@@ -299,6 +347,18 @@ export async function authLogin(email, password) {
   });
 }
 
+export async function authOAuth(provider, email, fullName = '', avatarUrl = null) {
+  return request('/api/v1/auth/oauth', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider,
+      email,
+      full_name: fullName,
+      avatar_url: avatarUrl
+    })
+  });
+}
+
 export async function authRefreshToken() {
   return request('/api/v1/auth/refresh', { method: 'POST' });
 }
@@ -363,6 +423,10 @@ export async function cancelScheduledJob(jobId) {
 }
 
 // 11. Watchlist (Saved Leads - People Only) API
+export async function getAllLeads(filter = 'all') {
+  return request(`/api/v1/leads?filter=${encodeURIComponent(filter)}`, { method: 'GET' });
+}
+
 export async function getWatchlist() {
   return request('/api/v1/watchlist', { method: 'GET' });
 }
@@ -466,10 +530,32 @@ export async function getQrPaymentStatus(qrId) {
   return request(`/api/v1/billing/qr/${qrId}/status`, { method: 'GET' });
 }
 
-export async function submitManualPayment(utr, planId) {
+export async function submitManualPayment(utr, itemId, itemType = 'sparks_pack') {
   return request('/api/v1/billing/manual-review', {
     method: 'POST',
-    body: JSON.stringify({ utr, plan_id: planId })
+    body: JSON.stringify({
+      utr,
+      item_id: itemId,
+      plan_id: itemId,
+      item_type: itemType
+    })
+  });
+}
+
+// 18. Admin Payments Management
+export async function getAdminPayments() {
+  return request('/api/v1/billing/admin/payments', { method: 'GET' });
+}
+
+export async function approveAdminPayment(paymentId) {
+  return request(`/api/v1/billing/admin/payments/${paymentId}/approve`, {
+    method: 'POST'
+  });
+}
+
+export async function rejectAdminPayment(paymentId) {
+  return request(`/api/v1/billing/admin/payments/${paymentId}/reject`, {
+    method: 'POST'
   });
 }
 

@@ -4,12 +4,13 @@ import secrets
 import hmac
 import hashlib
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 import jwt
 
 from app.core.config import settings
-from app.core.db import get_db_cursor
+from app.core.db import get_db_cursor, is_db_available
 from app.core.auth import get_current_user, AuthenticatedUser
 from app.core.logging import logger
 from app.services.sms_service import send_sms, clean_phone_number, is_valid_e164
@@ -52,6 +53,13 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str = Field(..., min_length=5, max_length=255)
     password: str = Field(..., min_length=1, max_length=128)
+
+
+class OAuthRequest(BaseModel):
+    provider: str = Field(..., description="google or linkedin")
+    email: str = Field(..., min_length=3, max_length=255)
+    full_name: Optional[str] = Field("", max_length=200)
+    avatar_url: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -205,6 +213,76 @@ async def login(req: LoginRequest):
     )
 
 
+@router.post("/oauth", response_model=AuthResponse)
+async def oauth_login(req: OAuthRequest):
+    """Handles OAuth sign-in / sign-up for Google and LinkedIn providers."""
+    email = req.email.strip().lower()
+    full_name = req.full_name.strip() if req.full_name else email.split("@")[0].replace(".", " ").title()
+    now = datetime.now(timezone.utc)
+    user_id = str(uuid.uuid4())
+    plan_tier = "free_trial"
+    sparks = 10.0
+    addy_msgs = 25
+
+    if is_db_available():
+        try:
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("SELECT id, email, full_name FROM public.users WHERE email = %s;", (email,))
+                existing = cur.fetchone()
+                if existing:
+                    user_id = str(existing["id"])
+                    full_name = existing.get("full_name") or full_name
+                else:
+                    cur.execute(
+                        """INSERT INTO public.users (id, email, password_hash, full_name, created_at, updated_at)
+                           VALUES (%s::uuid, %s, '', %s, %s, %s)
+                           ON CONFLICT (id) DO NOTHING;""",
+                        (user_id, email, full_name, now, now)
+                    )
+                    ws_id = str(uuid.uuid4())
+                    cur.execute(
+                        """INSERT INTO public.workspaces (id, name, owner_user_id, created_at)
+                           VALUES (%s::uuid, %s, %s::uuid, %s)
+                           ON CONFLICT DO NOTHING;""",
+                        (ws_id, f"{full_name}'s Workspace", user_id, now)
+                    )
+                    cur.execute(
+                        """INSERT INTO public.user_subscriptions (id, user_id, workspace_id, plan_tier, sparks_balance, sparks_monthly_quota, addy_messages_balance, created_at, updated_at)
+                           VALUES (%s::uuid, %s::uuid, %s::uuid, 'free_trial', 10.0, 10.0, 25, %s, %s)
+                           ON CONFLICT (user_id) DO NOTHING;""",
+                        (str(uuid.uuid4()), user_id, ws_id, now, now)
+                    )
+
+                # Fetch subscription details
+                cur.execute("SELECT plan_tier, sparks_balance, addy_messages_balance FROM public.user_subscriptions WHERE user_id = %s::uuid;", (user_id,))
+                sub = cur.fetchone()
+                if sub:
+                    plan_tier = sub.get("plan_tier") or plan_tier
+                    sparks = float(sub.get("sparks_balance") or sparks)
+                    addy_msgs = int(sub.get("addy_messages_balance") or addy_msgs)
+        except Exception as e:
+            logger.warning(f"OAuth DB persistence skipped (in-memory mode): {e}")
+
+    access_token = _create_token(user_id, email, timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS))
+    refresh_token = _create_token(user_id, email, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=ACCESS_TOKEN_EXPIRE_HOURS * 3600,
+        user={
+            "id": user_id,
+            "email": email,
+            "full_name": full_name,
+            "plan_tier": plan_tier,
+            "sparks_balance": sparks,
+            "addy_messages_balance": addy_msgs,
+            "workspace_name": f"{full_name}'s Workspace",
+            "provider": req.provider
+        }
+    )
+
+
 @router.post("/refresh")
 async def refresh_token(current_user: AuthenticatedUser = Depends(get_current_user)):
     """Issue a fresh access token using the current valid token."""
@@ -229,7 +307,8 @@ async def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
                           COALESCE(s.addy_messages_balance, 25) as addy_messages_balance,
                           COALESCE(s.playbook_claims_balance, 1) as playbook_claims_balance,
                           COALESCE(s.discount_claimed, false) as discount_claimed,
-                          COALESCE(w.name, 'General') as workspace_name
+                          COALESCE(w.name, 'General') as workspace_name,
+                          COALESCE((SELECT ABS(SUM(delta)) FROM public.credit_ledger WHERE user_id = u.id AND delta < 0), 0.0) as sparks_used
                    FROM public.users u
                    LEFT JOIN public.user_subscriptions s ON u.id = s.user_id
                    LEFT JOIN public.workspaces w ON w.owner_user_id = u.id
@@ -290,7 +369,8 @@ async def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
                               COALESCE(s.addy_messages_balance, 0) as addy_messages_balance,
                               COALESCE(s.playbook_claims_balance, 1) as playbook_claims_balance,
                               COALESCE(s.discount_claimed, false) as discount_claimed,
-                              COALESCE(w.name, 'General') as workspace_name
+                              COALESCE(w.name, 'General') as workspace_name,
+                              COALESCE((SELECT ABS(SUM(delta)) FROM public.credit_ledger WHERE user_id = u.id AND delta < 0), 0.0) as sparks_used
                        FROM public.users u
                        LEFT JOIN public.user_subscriptions s ON u.id = s.user_id
                        LEFT JOIN public.workspaces w ON w.owner_user_id = u.id
@@ -306,8 +386,9 @@ async def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
                     "full_name": "Advibe Founder",
                     "plan_tier": "free_trial",
                     "billing_interval": "monthly",
-                    "sparks_balance": 0.0,
+                    "sparks_balance": 10.0,
                     "sparks_monthly_quota": 10.0,
+                    "sparks_used": 0.0,
                     "addy_messages_balance": 0,
                     "playbook_claims_balance": 1,
                     "discount_claimed": False,
@@ -322,6 +403,8 @@ async def get_me(current_user: AuthenticatedUser = Depends(get_current_user)):
                     result[k] = v.isoformat()
                 elif isinstance(v, (int, float, str, bool, type(None))):
                     pass
+                elif hasattr(v, '__float__'):
+                    result[k] = float(v)
                 else:
                     result[k] = str(v)
             return result
